@@ -29,7 +29,7 @@ on:
         required: true
         type: string
       ECR_REGION_2: # Secondary AWS ECR region to push the Docker image to (optional)
-        type:string
+        type: string
     secrets:
       PKG_TOKEN:
         required: true
