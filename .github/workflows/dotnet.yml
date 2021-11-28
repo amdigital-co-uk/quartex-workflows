@@ -1,0 +1,138 @@
+# CI workflow for Quartex .NET application
+name: Build and Package
+
+# Define triggers for when the workflow will run
+on:
+  workflow_call:
+    inputs:
+      REF:
+        type: string
+      PROJECT:      # Name of the .csproj file to be built
+        required: true
+        type: string
+      COMPONENT:    # Component name
+        required: true
+        type: string
+      CONFIGS:      # Configuration repository name: Populate if raw config files are required by the application
+        required: true
+        type: boolean
+      DK_NAMESPACE: # Docker Namespace: Typically this will be 'qtms' for a microservice or 'qtui' for a webapp
+        required: true
+        type: string
+      DK_IMAGE:     # Docker Image
+        required: true
+        type: string
+      DK_TAG:       # Default Docker tag: - this should be latest in most cases
+        required: true
+        type: string
+      ECR_REGION_1: # Primary AWS ECR region
+        required: true
+        type: string
+      ECR_REGION_2: # Secondary AWS ECR region to push the Docker image to (optional)
+        type:string
+    secrets:
+      PKG_TOKEN:
+        required: true
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
+
+jobs:
+  build:
+    name: Test, Build and Package
+    runs-on: ubuntu-latest
+    env:
+      REF: ${{ inputs.REF }}
+      DK_TAG: ${{ inputs.DK_TAG }}
+    steps:
+      # Checks-out repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.REF }}
+
+      # Determine correct Docker tag based on branch/release
+      - name: Set tag based on branch
+        run: |
+          if [[ "$REF" == refs/heads/* ]]
+          then
+            SCC_BRANCH=$(echo ${REF#refs/heads/})
+            echo "Branch/Tag parsing: HEAD case -- REF=$REF"
+          elif [[ "$REF" == refs/tags/* ]]
+          then
+            SCC_TAG=$(echo ${REF#refs/tags/})
+            echo "Branch/Tag parsing: TAG case -- REF=$REF"
+          else
+            SCC_BRANCH=$REF
+            echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
+          fi
+          [[ "$SCC_BRANCH" == feature/* ]] && DK_TAG=feature-$(echo ${SCC_BRANCH#feature/})
+          [[ "$SCC_BRANCH" == bug/* ]] && DK_TAG=fix-$(echo ${SCC_BRANCH#bug/})
+          [[ "$SCC_BRANCH" == release/* ]] && DK_TAG=release-$(echo ${SCC_BRANCH#release/})
+          [[ "$SCC_TAG" == v* ]] && DK_TAG=$SCC_TAG
+          echo "BRANCH=$SCC_BRANCH"
+          echo "TAG=$SCC_TAG"
+          echo "DK_TAG=$DK_TAG"
+          echo "DK_TAG=$DK_TAG" >> $GITHUB_ENV
+      
+      # Checkout shared configuration (if required)
+      - name: Checkout shared configuration
+        if: ${{ input.CONFIGS != '' }}
+        uses: actions/checkout@v2
+        with:
+          repository: ${{ inputs.configs }}
+          token: ${{ secrets.SRC_TOKEN }}
+          path: config
+      - name: Copy shared configuration into project
+        if: ${{ inputs.CONFIGS == 'true' }}
+        run: cp config/*/*.json $PROJECT
+
+      # Login to ECR_REGION_1
+      # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.ECR_REGION_1 }}
+      - name: Login to Amazon ECR (us-east-1)
+        id: login-ecr-1
+        uses: aws-actions/amazon-ecr-login@v1
+        
+      # Login to ECR_REGION_2
+      - name: Configure AWS credentials (ECR_REGION_2)
+        if: ${{ inputs.ECR_REGION_2 != '' }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.ECR_REGION_2 }}
+      - name: Login to Amazon ECR (us-east-2)
+        if: ${{ inputs.ECR_REGION_2 != '' }}
+        id: login-ecr-2
+        uses: aws-actions/amazon-ecr-login@v1
+
+      # Login to GitHub packages
+      - name: Login to GitHub packages
+        uses: actions/setup-dotnet@v1
+        with:
+          source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
+        
+      # Build container via Docker & push to ECR
+      - name: Build Docker Image
+        id: build
+        env:
+          COMPONENT: ${{ inputs.COMPONENT }}
+          DK_NAMESPACE: ${{ inputs.DK_NAMESPACE }}
+          DK_IMAGE: ${{ inputs.DK_IMAGE }}
+          DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
+          DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
+        run: |
+          cp ../nuget.config .
+          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT
+          docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
+          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
+          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG

@@ -1,0 +1,56 @@
+# Run unit tests
+name: Run XUnit Tests
+
+# Define Parameters
+on:
+  workflow_call:
+    inputs:
+      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
+        required: true
+        type: number
+      DOCKER_COMPOSE:   # Path to docker-compose.yml file: If populated, spins up containers required for integration tests
+        type: string
+    secrets:
+      PKG_TOKEN:
+        required: true
+
+
+jobs:
+  xunit:
+    name: Run XUnit Tests
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+      # Spins up services via Docker-compose
+      - name: Start containers
+        if: ${{ inputs.DOCKER_COMPOSE != '' }}
+        run: docker compose -f ${{ inputs.DOCKER_COMPOSE }} up -d
+      
+      # Login to GitHub packages
+      - name: Login to GitHub packages
+        uses: actions/setup-dotnet@v1
+        with:
+          source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
+    
+      # Run Unit Tests
+      - name: Run Unit Tests
+        run: dotnet test --collect:"XPlat Code Coverage"
+
+      - name: Install code coverage tool
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+        
+      - name: Run report generation
+        run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
+
+      - name: Check Branch Coverage
+        id: coverage
+        uses: amdigital-co-uk/code-coverage-action@v1.0
+        with:
+          path: ${{ runner.temp }}/coverlet/reports/Cobertura.xml
+          branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
+

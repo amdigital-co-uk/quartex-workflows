@@ -1,0 +1,48 @@
+# CI workflow for Quartex NuGet packages
+name: Build and publish NuGet package
+
+on:
+  workflow_call:
+    inputs:
+      SKIP_DUPLICATE:   # Set to false to error when pushing duplicate versions
+        required: true
+        type: boolean
+      PKG_SRC:          # URL of private GitHub packages feed to push to
+        required: true
+        type: string
+      PROJECTS:         # Space-delimited string of .NET projects to build and pack
+        required: true
+        type: string
+    secrets:
+
+jobs:
+  nuget:
+    name: Build and publish NuGet package
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      
+      # Login to GitHub packages
+      - name: Login to GitHub packages
+        uses: actions/setup-dotnet@v1
+        with:
+          source-url: ${{ inputs.PKG_SRC }}
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.PKG_TOKEN }}
+      
+      # Package libraries and push to GitHub packages
+      - name: Create and push NugetPackages packages
+        run: |
+          flags="-k ${{secrets.GITHUB_TOKEN}} -s Source"
+          [ "${{ inputs.SKIP_DUPLICATE}}" = "true" ] && flags="$flags --skip-duplicate"
+          for project in ${{ inputs.PROJECTS }}
+          do
+            cd $project
+            cp ../../nuget.config .
+            dotnet restore
+            dotnet pack -c Release -o pkgs --no-restore
+            dotnet nuget push pkgs/*.nupkg $flags
+            cd ..
+          done
