@@ -34,7 +34,7 @@ jobs:
           NUGET_AUTH_TOKEN: ${{ secrets.PKG_TOKEN }}
       
       # Package libraries and push to GitHub packages
-      - name: Create and push NugetPackages packages
+      - name: Create and push NuGet packages
         run: |
           flags="-k ${{secrets.GITHUB_TOKEN}} -s Source"
           [ "${{ inputs.SKIP_DUPLICATE}}" = "true" ] && flags="$flags --skip-duplicate"
