@@ -14,7 +14,8 @@ on:
         required: true
         type: string
     secrets:
-
+      PKG_TOKEN:
+        required: true
 jobs:
   nuget:
     name: Build and publish NuGet package
