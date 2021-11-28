@@ -40,13 +40,12 @@ Note this assumes our standard format of `Dockerfile`.
 ```yml
 jobs:
   dotnet:
-    needs: xunit
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
     uses: amdigital-co-uk/quartex-workflows/.github/workflows/dotnet.yml@v1
     with:
       REF: ${{ github.ref }}
       PROJECT: Quartex.Sample.Service
       COMPONENT: sample-service
-      QT_CONFIGS: false
       DK_NAMESPACE: samples
       DK_IMAGE: sample-docker-image
       DK_TAG: latest
