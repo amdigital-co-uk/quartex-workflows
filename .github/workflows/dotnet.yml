@@ -78,10 +78,10 @@ jobs:
       
       # Checkout shared configuration (if required)
       - name: Checkout shared configuration
-        if: ${{ input.CONFIGS != '' }}
+        if: ${{ inputs.CONFIGS != '' }}
         uses: actions/checkout@v2
         with:
-          repository: ${{ inputs.configs }}
+          repository: ${{ inputs.CONFIGS }}
           token: ${{ secrets.SRC_TOKEN }}
           path: config
       - name: Copy shared configuration into project
