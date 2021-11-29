@@ -125,6 +125,7 @@ jobs:
         id: build
         env:
           COMPONENT: ${{ inputs.COMPONENT }}
+          PROJECT: ${{ inputs.PROJECT }}
           DK_NAMESPACE: ${{ inputs.DK_NAMESPACE }}
           DK_IMAGE: ${{ inputs.DK_IMAGE }}
           DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
