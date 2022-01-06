@@ -1,0 +1,78 @@
+# CI workflow for Quartex NuGet packages
+name: Build and publish NuGet package
+
+on:
+  workflow_call:
+    inputs:
+      PKG_SRC:        # URL of private GitHub packages feed to push to
+        required: true
+        type: string
+      PROJECT:          # .NET project that generates the TypeScript
+        required: true
+        type: string
+      NAMESPACE:        # Namespace of request objects to include
+        required: true
+        type: string
+      DOTNET:           # Dotnet version of project
+        required: false
+        type: string
+      PREFIX:           # TypeScript-safe prefix for client and request config classnames
+        required: true
+        type: string
+      NPM_SRC:          # NPM Feed to push packages to
+        required: true
+        type: string
+      NPM_SCOPE:        # NPM Scope
+        required: true
+        type: string
+      PACKAGE:          # Package (must include scope)
+        required: true
+        type: string
+      
+    secrets:
+      PKG_TOKEN:
+        required: true
+
+jobs:
+  npm:
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+      # Login to GitHub packages
+      - name: Login to GitHub packages
+        uses: actions/setup-dotnet@v1
+        with:
+          source-url: ${{ inputs.PKG_SRC }}
+          dotnet-version: ${{ inputs.DOTNET }}
+        env:
+          NUGET_AUTH_TOKEN: ${{ secrets.PKG_TOKEN }}
+      # Generate NPM code
+      - name: Generate NPM package
+        env:
+          NAMESPACE: ${{ inputs.NAMESPACE }}
+        run: |
+          VERSION=$(cat $NAMESPACE/$NAMESPACE.csproj | grep "<Version>" | cut -d ">" -f 2 | cut -d "<" -f1)
+          cd ${{ inputs.PROJECT }}
+          echo "{}" > compiled-config.json
+          dotnet restore && dotnet build
+          dotnet run --generate-api-ts .. ${{ inputs.PREFIX }} ${{ inputs.NAMESPACE }} "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" ${{ inputs.NPM_SCOPE }}/${{ inputs.PACKAGE }} $VERSION
+          cat ../package.json
+      # Setup .npmrc file to publish to Github packages
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v2
+        with:
+          node-version: '12.x'
+          registry-url: ${{ inputs.NPM_SRC }}
+          scope: ${{ inputs.NPM_SCOPE }}
+
+      - name: Install dependencies
+        run: npm install && npm run build
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.PKG_TOKEN }}
+
+      - name: Publish package to npm registry
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
