@@ -59,6 +59,7 @@ jobs:
           dotnet restore && dotnet build
           dotnet run --generate-api-ts .. ${{ inputs.PREFIX }} ${{ inputs.NAMESPACE }} "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" ${{ inputs.NPM_SCOPE }}/${{ inputs.PACKAGE }} $VERSION
           cat ../package.json
+          cat ../src/requests.ts
       # Setup .npmrc file to publish to Github packages
       - name: Setup Node and NPM
         uses: actions/setup-node@v2
