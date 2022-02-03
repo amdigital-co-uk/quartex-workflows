@@ -29,6 +29,10 @@ on:
         type: string
       ECR_REGION_2: # Secondary AWS ECR region to push the Docker image to (optional)
         type: string
+      BUILD_NPMRC:
+        required: false
+        type: boolean
+        default: false
     secrets:
       PKG_TOKEN:
         required: true
@@ -120,6 +124,16 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
         
+      # Npmrc Setup
+      - name: Npm Access Setup
+        id: npmrcsetup
+        if: ${{ inputs.BUILD_NPMRC == true }}
+        run: |
+          cat >.npmrc <<EOL
+          //npm.pkg.github.com/:_authToken=${{ secrets.PKG_TOKEN }}
+          @amdigital-co-uk:registry=https://npm.pkg.github.com/
+          EOL
+          
       # Build container via Docker & push to ECR
       - name: Build Docker Image
         id: build
@@ -131,7 +145,7 @@ jobs:
           DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
-          cp ../nuget.config .
+          cp ../nuget.config .          
           docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
