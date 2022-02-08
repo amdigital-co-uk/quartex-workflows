@@ -14,6 +14,9 @@ on:
         default: 0
       COVERAGE_S3_PATH: # S3 path of the CSV that stores historic coverage data (file can contain multiple repos/branches)
         type: string
+      NEVER_FAIL_AT:
+        type: number
+        default: 40
       AWS_REGION:
         type: string
         default: us-east-1
@@ -112,8 +115,13 @@ jobs:
 
             if (( $(echo "$total_persist > $total_rate" | bc -l) ))
             then
-              echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
-              exit 1
+              if (( $(echo "${{inputs.NEVER_FAIL_AT}} < $total_rate" | bc -l) ))
+              then
+                echo "::notice title=Branch coverage fallen::Test coverage has dropped from $total_persist to $total_rate, but is still above ${{inputs.NEVER_FAIL_AT}} "
+              else
+                echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
+                exit 1
+              fi
             else
               echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
             fi
