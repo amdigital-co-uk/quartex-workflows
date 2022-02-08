@@ -80,7 +80,7 @@ jobs:
           total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
           integ_rate=$(get_branch "$integ_report")
           unit_rate=$(get_branch "$unit_report")
-          echo "Coverage for $REPO@REF -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
+          echo "Coverage for $REPO@$REF -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
           
           aws s3 cp $COVERAGE_S3_PATH repos.csv
           record_exists=$(cat repos.csv | grep "^$REPO,$REF," | wc -l)
