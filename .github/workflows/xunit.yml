@@ -16,7 +16,7 @@ on:
         type: string
       NEVER_FAIL_AT:
         type: number
-        default: 40
+        default: 0.4
       AWS_REGION:
         type: string
         default: us-east-1
