@@ -16,7 +16,7 @@ on:
         type: string
       NEVER_FAIL_AT:
         type: number
-        default: 0.95
+        default: 95
       AWS_REGION:
         type: string
         default: us-east-1
@@ -84,13 +84,21 @@ jobs:
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
           COVERAGE_S3_PATH: ${{ inputs.COVERAGE_S3_PATH }}
+          NEVER_FAIL_AT: ${{ inputs.NEVER_FAIL_AT }}
         run: |
           get_branch() {
-            if [ -f "$1" ]; then
-              cat "$1" | sed -e 's/\r//g' | grep -Po --color=never '<coverage.+branch-rate="\K[^"]+' | head -c 6
-            else
-              echo 0
-            fi
+              if [ -f "$1" ]; then
+                  raw=$(cat "$1" | sed -e 's/\r//g' | grep -Po --color=never '<coverage.+branch-rate="\K[^"]+')
+                  echo "$raw * 100" | bc -l | head -c 6
+              else
+                  echo 0
+              fi
+          }
+
+          get_record() {
+            local record=$(cat repos.csv | grep "^$1,$2,")
+            [ -z "$record" ] && record=$(cat repos.csv | grep "^$1,$3,")
+            echo $record
           }
 
           [ "$BRANCH" = "main" ] || BRANCH=latest
@@ -100,36 +108,34 @@ jobs:
           total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
           integ_rate=$(get_branch "$integ_report")
           unit_rate=$(get_branch "$unit_report")
-          echo "Branch coverage rates for $REPO@${{ github.ref_name }} -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
+          echo "Branch coverage rates for $REPO@$BRANCH -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
 
           aws s3 cp $COVERAGE_S3_PATH repos.csv
-          record_exists=$(cat repos.csv | grep "^$REPO,$BRANCH," | wc -l)
+          record=$(get_record "$REPO" "$BRANCH" "main")
 
-          if [ "$record_exists" -gt 0 ]
+          if [ -n "$record" ]
           then
-            record=$(cat repos.csv | grep "^$REPO,$BRANCH,")
-            
-            total_persist=$(echo $record | cut -d, -f3)
-            integ_persist=$(echo $record | cut -d, -f4)
-            unit_persist=$(echo $record | cut -d, -f5)
+              total_persist=$(echo $record | cut -d, -f3)
+              integ_persist=$(echo $record | cut -d, -f4)
+              unit_persist=$(echo $record | cut -d, -f5)
 
-            if (( $(echo "$total_persist > $total_rate" | bc -l) ))
-            then
-              if (( $(echo "${{inputs.NEVER_FAIL_AT}} < $total_rate" | bc -l) ))
+              if (( $(echo "$total_persist > $total_rate" | bc -l) ))
               then
-                echo "::notice title=Branch coverage fallen::Test coverage has dropped from $total_persist to $total_rate, but is still above ${{inputs.NEVER_FAIL_AT}} "
+                  if (( $(echo "$NEVER_FAIL_AT < $total_rate" | bc -l) ))
+                  then
+                      echo "::notice title=Branch coverage fallen::Test coverage has dropped from $total_persist to $total_rate, but is still above $NEVER_FAIL_AT"
+                  else
+                      echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
+                      exit 1
+                  fi
               else
-                echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
-                exit 1
+                  echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
               fi
-            else
-              echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
-            fi
 
-            cat repos.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
-            mv repos.tmp repos.csv
+              cat repos.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
+              mv repos.tmp repos.csv
           else
-            echo "First time coverage reporting for $REPO@$BRANCH"
+              echo "First time coverage reporting for $REPO@$BRANCH"
           fi
 
           echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> repos.csv
