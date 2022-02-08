@@ -10,10 +10,15 @@ on:
         type: number
       DOCKER_COMPOSE:   # Path to docker-compose.yml file: If populated, spins up containers required for integration tests
         type: string
+      AWS_REGION:
+        type: string
     secrets:
       PKG_TOKEN:
         required: true
-
+      AWS_ACCESS_KEY_ID:
+        required: true
+      AWS_SECRET_ACCESS_KEY:
+        required: true
 
 jobs:
   xunit:
@@ -46,6 +51,13 @@ jobs:
         
       - name: Run report generation
         run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
+
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.AWS_REGION }}
 
       - name: Check Branch Coverage
         id: coverage
