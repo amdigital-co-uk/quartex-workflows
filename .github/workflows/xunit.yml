@@ -80,6 +80,8 @@ jobs:
           total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
           integ_rate=$(get_branch "$integ_report")
           unit_rate=$(get_branch "$unit_report")
+          echo "Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
+          
           aws s3 cp $COVERAGE_S3_PATH repos.csv
           record=$(cat repos.csv | grep "^$REPO,$REF,")
 
@@ -93,6 +95,8 @@ jobs:
             then
               echo "ERROR: Test coverage has dropped from $total_persist to $total_rate"
               exit 1
+            else
+              echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
             fi
 
             cat repos.csv | grep -v "^$REPO,$REF," > repos.tmp
@@ -101,4 +105,5 @@ jobs:
 
           echo "$REPO,$REF,$total_rate,$integ_rate,$unit_rate" >> repos.csv
           aws s3 cp repos.csv $COVERAGE_S3_PATH
+          exit 0
 
