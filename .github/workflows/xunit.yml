@@ -112,7 +112,7 @@ jobs:
 
             if (( $(echo "$total_persist > $total_rate" | bc -l) ))
             then
-              echo "::setFailed title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
+              echo "::setFailed::Test coverage has dropped from $total_persist to $total_rate"
               #exit 1
             else
               echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
