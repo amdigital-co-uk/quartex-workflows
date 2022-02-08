@@ -18,7 +18,9 @@ on:
       PKG_TOKEN:
         required: true
       AWS_ACCESS_KEY_ID:
+        required: false
       AWS_SECRET_ACCESS_KEY:
+        required: false
 
 jobs:
   xunit:
