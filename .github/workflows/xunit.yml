@@ -5,20 +5,20 @@ name: Run XUnit Tests
 on:
   workflow_call:
     inputs:
-      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
-        required: true
-        type: number
       DOCKER_COMPOSE:   # Path to docker-compose.yml file: If populated, spins up containers required for integration tests
         type: string
-      AWS_REGION:
+      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
+                        # If NOT populated, use historic data from previous runs as the threshold.
+                        # Historic data stored in S3, so the AWS secrets must be populated in this instance
+        type: number
+        default: 0
+      COVERAGE_S3_PATH: # S3 path of the CSV that stores historic coverage data (file can contain multiple repos/branches)
         type: string
     secrets:
       PKG_TOKEN:
         required: true
       AWS_ACCESS_KEY_ID:
-        required: true
       AWS_SECRET_ACCESS_KEY:
-        required: true
 
 jobs:
   xunit:
@@ -52,19 +52,30 @@ jobs:
       - name: Run report generation
         run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
 
-      - name: Configure AWS credentials (ECR_REGION_1)
+      # Compare against static threshold (BRANCH_THRESHOLD is populated)
+      - name: Check Branch Coverage
+        id: coverage
+        if: ${{ inputs.BRANCH_THRESHOLD > 0 }}
+        uses: amdigital-co-uk/code-coverage-action@v1.0
+        with:
+          path: ${{ runner.temp }}/coverlet/reports/Cobertura.xml
+          branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
+
+      # Compare against historic coverage (BRANCH_THRESHOLD is empty or 0, AWS secrets populated)
+      # Historic data stored in a CSV file in S3, and is updated if coverage improves.
+      - name: Configure AWS credentials
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ inputs.AWS_REGION }}
 
       - name: Check Branch Coverage
-        id: coverage
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
         env:
-          COVERAGE_S3_PATH: s3://amdigital-co-uk-code-audits/code-coverage/repos.csv
           REPO: ${{ github.repository }}
           BRANCH: ${{ github.ref_name }}
+          COVERAGE_S3_PATH: ${{ inputs.COVERAGE_S3_PATH }}
         run: |
           get_branch() {
             if [ -f "$1" ]; then
