@@ -49,8 +49,44 @@ jobs:
 
       - name: Check Branch Coverage
         id: coverage
-        uses: amdigital-co-uk/code-coverage-action@v1.0
-        with:
-          path: ${{ runner.temp }}/coverlet/reports/Cobertura.xml
-          branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
+        env:
+          COVERAGE_S3_PATH: s3://amdigital-co-uk-code-audits/code-coverage/repos.csv
+          REPO: ${{ github.repository }}
+          REF: ${{ github.ref_name }}
+        run: |
+          get_branch() {
+            if [ -f "$1" ]; then
+              cat "$1" | sed -e 's/\r//g' | grep -Po --color=never '<coverage.+branch-rate="\K[^"]+' | head -c 6
+            else
+              echo 0
+            fi
+          }
+
+          integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest")
+          unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test")
+
+          total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
+          integ_rate=$(get_branch "$integ_report")
+          unit_rate=$(get_branch "$unit_report")
+          aws s3 cp $COVERAGE_S3_PATH repos.csv
+          record=$(cat repos.csv | grep "^$REPO,$REF,")
+
+          if [ -n "$record" ]
+          then
+            total_persist=$(echo $record | cut -d, -f3)
+            integ_persist=$(echo $record | cut -d, -f4)
+            unit_persist=$(echo $record | cut -d, -f5)
+
+            if (( $(echo "$total_persist > $total_rate" | bc -l) ))
+            then
+              echo "ERROR: Test coverage has dropped from $total_persist to $total_rate"
+              exit 1
+            fi
+
+            cat repos.csv | grep -v "^$REPO,$REF," > repos.tmp
+            mv repos.tmp repos.csv
+          fi
+
+          echo "$REPO,$REF,$total_rate,$integ_rate,$unit_rate" >> repos.csv
+          aws s3 cp repos.csv $COVERAGE_S3_PATH
 
