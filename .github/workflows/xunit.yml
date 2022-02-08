@@ -55,8 +55,7 @@ jobs:
         run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
 
       # Compare against static threshold (BRANCH_THRESHOLD is populated)
-      - name: Check Branch Coverage
-        id: coverage
+      - name: Check Branch Coverage against static threshold
         if: ${{ inputs.BRANCH_THRESHOLD > 0 }}
         uses: amdigital-co-uk/code-coverage-action@v1.0
         with:
@@ -72,7 +71,7 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 
-      - name: Check Branch Coverage
+      - name: Check Branch Coverage against historic data
         if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
         env:
           REPO: ${{ github.repository }}
