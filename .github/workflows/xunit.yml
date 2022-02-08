@@ -112,8 +112,8 @@ jobs:
 
             if (( $(echo "$total_persist > $total_rate" | bc -l) ))
             then
-              echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
-              exit 1
+              echo "::setFailed title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
+              #exit 1
             else
               echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
             fi
@@ -123,8 +123,8 @@ jobs:
           else
             echo "First time coverage reporting for $REPO@$BRANCH"
           fi
-
-          echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> repos.csv
-          aws s3 cp repos.csv $COVERAGE_S3_PATH
-          exit 0
+          echo "Got HERE!"
+          #echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> repos.csv
+          #aws s3 cp repos.csv $COVERAGE_S3_PATH
+          #exit 0
 
