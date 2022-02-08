@@ -104,6 +104,8 @@ jobs:
 
             cat repos.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
             mv repos.tmp repos.csv
+          else
+            echo "First time coverage reporting for $REPO@$BRANCH"
           fi
 
           echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> repos.csv
