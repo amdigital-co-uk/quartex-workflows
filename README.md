@@ -8,6 +8,10 @@ Note that the secrets are defined at organisation level, so shouldn't need defin
 
 ## Run .NET Core automated tests via XUnit
 
+### Check branch coverage against Static Threshold
+
+Default behaviour when setting `BRANCH_THRESHOLD` is to report test coverage and fail the workflow if it does not meet the threshold.
+
 ```yml
 jobs:
   xunit:
@@ -17,6 +21,27 @@ jobs:
       BRANCH_THRESHOLD: 80
     secrets:
       PKG_TOKEN: ${{ secrets.PKG_TOKEN }}
+```
+
+### Check branch coverage against historic data
+
+Alternatively, when omitting `BRANCH_THRESHOLD` you can instead set the following parameters and secret values, to have the workflow check current test coverage against the last recorded test coverage for the same repository (test coverage values are stored in a CSV in S3 at the configured location).
+
+If coverage goes down, you see a failure; if it is maintained or improved, the new value will be persisted back to S3 as the new threshold for future runs.
+
+```yml
+jobs:
+  xunit:
+    uses: amdigital-co-uk/quartex-workflows/.github/workflows/xunit.yml@vNext
+    with:
+      DOCKER_COMPOSE: Quartex.Sample.Service.IntegrationTests/docker-compose.yml
+      COVERAGE_S3_PATH: s3://my-s3-bucket/code-coverage-reporting/repos.csv
+      AWS_REGION: us-west-2   # default is us-east-1
+      NEVER_FAIL_AT: 0.99     # default is 0.95
+    secrets:
+      PKG_TOKEN: ${{ secrets.PKG_TOKEN }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
 ```
 
 ## Create and push NuGet packages to private GitHub packages feed
