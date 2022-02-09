@@ -107,7 +107,7 @@ jobs:
           [ "$BRANCH" = "main" ] && PERSIST=true
           [ "$BRANCH" = "main" ] || BRANCH=latest
 
-          aws s3 cp --quiet $COVERAGE_S3_PATH coverage.csv
+          aws s3 cp --quiet $COVERAGE_S3_PATH coverage.csv || true
 
           if [ ! -f "coverage.csv" ]
           then
