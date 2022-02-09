@@ -85,7 +85,9 @@ jobs:
           BRANCH: ${{ github.ref_name }}
           COVERAGE_S3_PATH: ${{ inputs.COVERAGE_S3_PATH }}
           NEVER_FAIL_AT: ${{ inputs.NEVER_FAIL_AT }}
+          PERSIST: false
         run: |
+          # Utility Functions
           get_branch() {
               if [ -f "$1" ]; then
                   raw=$(cat "$1" | sed -e 's/\r//g' | grep -Po --color=never '<coverage.+branch-rate="\K[^"]+')
@@ -96,22 +98,34 @@ jobs:
           }
 
           get_record() {
-            local record=$(cat repos.csv | grep "^$1,$2,")
-            [ -z "$record" ] && record=$(cat repos.csv | grep "^$1,$3,")
-            echo $record
+                  local record=$(cat coverage.csv | grep "^$1,$2,")
+                  [ -z "$record" ] && record=$(cat coverage.csv | grep "^$1,$3,")
+                  echo $record
           }
 
+          # Set behaviour based on current branch
+          [ "$BRANCH" = "main" ] && PERSIST=true
           [ "$BRANCH" = "main" ] || BRANCH=latest
+
+          aws s3 cp --quiet $COVERAGE_S3_PATH coverage.csv
+
+          if [ ! -f "coverage.csv" ]
+          then
+              echo "Repository,Branch,Total Branch Rate,Integration Branch Rate,Unit Branch Rate"  > coverage.csv
+              PERSIST=true
+          fi
+
+          # Parse current branch coverage
           integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest")
           unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test")
-
           total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
           integ_rate=$(get_branch "$integ_report")
           unit_rate=$(get_branch "$unit_report")
           echo "Branch coverage rates for $REPO@$BRANCH -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
 
-          aws s3 cp $COVERAGE_S3_PATH repos.csv
-          record=$(get_record "$REPO" "$BRANCH" "main")
+
+          # Parse historic coverage and cross-check
+          record=$(get_record "$REPO" "main" "latest")
 
           if [ -n "$record" ]
           then
@@ -132,13 +146,16 @@ jobs:
                   echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
               fi
 
-              cat repos.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
-              mv repos.tmp repos.csv
+              # Remove current coverage values
+              cat coverage.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
+              mv repos.tmp coverage.csv
           else
               echo "First time coverage reporting for $REPO@$BRANCH"
           fi
 
-          echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> repos.csv
-          aws s3 cp repos.csv $COVERAGE_S3_PATH
+          # Add new coverage values and persist
+          echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> coverage.csv
+          [ "$PERSIST" = "true" ] && aws s3 cp --quiet coverage.csv $COVERAGE_S3_PATH
+
           exit 0
 
