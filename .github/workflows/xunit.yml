@@ -150,7 +150,7 @@ jobs:
               cat coverage.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
               mv repos.tmp coverage.csv
           else
-              echo "First time coverage reporting for $REPO@$BRANCH"
+              echo "::notice::First time coverage reporting for $REPO@$BRANCH"
           fi
 
           # Add new coverage values and persist
