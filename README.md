@@ -32,7 +32,7 @@ If coverage goes down, you see a failure; if it is maintained or improved, the n
 ```yml
 jobs:
   xunit:
-    uses: amdigital-co-uk/quartex-workflows/.github/workflows/xunit.yml@vNext
+    uses: amdigital-co-uk/quartex-workflows/.github/workflows/xunit.yml@v2
     with:
       DOCKER_COMPOSE: Quartex.Sample.Service.IntegrationTests/docker-compose.yml
       COVERAGE_S3_PATH: s3://my-s3-bucket/code-coverage-reporting/repos.csv
