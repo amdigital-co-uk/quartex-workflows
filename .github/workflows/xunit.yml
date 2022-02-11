@@ -5,15 +5,28 @@ name: Run XUnit Tests
 on:
   workflow_call:
     inputs:
-      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
-        required: true
-        type: number
       DOCKER_COMPOSE:   # Path to docker-compose.yml file: If populated, spins up containers required for integration tests
         type: string
+      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
+                        # If NOT populated, use historic data from previous runs as the threshold.
+                        # Historic data stored in S3, so the AWS secrets must be populated in this instance
+        type: number
+        default: 0
+      COVERAGE_S3_PATH: # S3 path of the CSV that stores historic coverage data (file can contain multiple repos/branches)
+        type: string
+      NEVER_FAIL_AT:
+        type: number
+        default: 95
+      AWS_REGION:
+        type: string
+        default: us-east-1
     secrets:
       PKG_TOKEN:
         required: true
-
+      AWS_ACCESS_KEY_ID:
+        required: false
+      AWS_SECRET_ACCESS_KEY:
+        required: false
 
 jobs:
   xunit:
@@ -47,10 +60,102 @@ jobs:
       - name: Run report generation
         run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
 
-      - name: Check Branch Coverage
-        id: coverage
+      # Compare against static threshold (BRANCH_THRESHOLD is populated)
+      - name: Check Branch Coverage against static threshold
+        if: ${{ inputs.BRANCH_THRESHOLD > 0 }}
         uses: amdigital-co-uk/code-coverage-action@v1.0
         with:
           path: ${{ runner.temp }}/coverlet/reports/Cobertura.xml
           branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
+
+      # Compare against historic coverage (BRANCH_THRESHOLD is empty or 0, AWS secrets populated)
+      # Historic data stored in a CSV file in S3, and is updated if coverage improves.
+      - name: Configure AWS credentials
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ inputs.AWS_REGION }}
+
+      - name: Check Branch Coverage against historic data
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
+        env:
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COVERAGE_S3_PATH: ${{ inputs.COVERAGE_S3_PATH }}
+          NEVER_FAIL_AT: ${{ inputs.NEVER_FAIL_AT }}
+          PERSIST: false
+        run: |
+          # Utility Functions
+          get_branch() {
+              if [ -f "$1" ]; then
+                  raw=$(cat "$1" | sed -e 's/\r//g' | grep -Po --color=never '<coverage.+branch-rate="\K[^"]+')
+                  echo "$raw * 100" | bc -l | head -c 6
+              else
+                  echo 0
+              fi
+          }
+
+          get_record() {
+                  local record=$(cat coverage.csv | grep "^$1,$2,")
+                  [ -z "$record" ] && record=$(cat coverage.csv | grep "^$1,$3,")
+                  echo $record
+          }
+
+          # Set behaviour based on current branch
+          [ "$BRANCH" = "main" ] && PERSIST=true
+          [ "$BRANCH" = "main" ] || BRANCH=latest
+
+          aws s3 cp --quiet $COVERAGE_S3_PATH coverage.csv || true
+
+          if [ ! -f "coverage.csv" ]
+          then
+              echo "Repository,Branch,Total Branch Rate,Integration Branch Rate,Unit Branch Rate"  > coverage.csv
+              PERSIST=true
+          fi
+
+          # Parse current branch coverage
+          integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest")
+          unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test")
+          total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
+          integ_rate=$(get_branch "$integ_report")
+          unit_rate=$(get_branch "$unit_report")
+          echo "Branch coverage rates for $REPO@$BRANCH -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
+
+
+          # Parse historic coverage and cross-check
+          record=$(get_record "$REPO" "main" "latest")
+
+          if [ -n "$record" ]
+          then
+              total_persist=$(echo $record | cut -d, -f3)
+              integ_persist=$(echo $record | cut -d, -f4)
+              unit_persist=$(echo $record | cut -d, -f5)
+
+              if (( $(echo "$total_persist > $total_rate" | bc -l) ))
+              then
+                  if (( $(echo "$NEVER_FAIL_AT < $total_rate" | bc -l) ))
+                  then
+                      echo "::notice title=Branch coverage fallen::Test coverage has dropped from $total_persist to $total_rate, but is still above $NEVER_FAIL_AT"
+                  else
+                      echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
+                      exit 1
+                  fi
+              else
+                  echo "SUCCESS: Test coverage maintained from $total_persist to $total_rate"
+              fi
+
+              # Remove current coverage values
+              cat coverage.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
+              mv repos.tmp coverage.csv
+          else
+              echo "::notice::First time coverage reporting for $REPO@$BRANCH"
+          fi
+
+          # Add new coverage values and persist
+          echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> coverage.csv
+          [ "$PERSIST" = "true" ] && aws s3 cp --quiet coverage.csv $COVERAGE_S3_PATH
+
+          exit 0
 
