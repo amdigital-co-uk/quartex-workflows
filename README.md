@@ -35,7 +35,7 @@ jobs:
     uses: amdigital-co-uk/quartex-workflows/.github/workflows/xunit.yml@v2
     with:
       DOCKER_COMPOSE: Quartex.Sample.Service.IntegrationTests/docker-compose.yml
-      COVERAGE_S3_PATH: s3://my-s3-bucket/code-coverage-reporting/repos.csv
+      COVERAGE_S3_PATH: s3://my-s3-bucket/code-coverage-reporting/my-repo.csv # this path should be a unique CSV file for each repo
       AWS_REGION: us-west-2   # default is us-east-1
       NEVER_FAIL_AT: 99     # default is 95
     secrets:
