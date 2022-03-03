@@ -127,8 +127,8 @@ jobs:
           fi
 
           # Parse current branch coverage
-          integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest")
-          unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test")
+          integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest" || true)
+          unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test" || true)
           log_debug "integ_report=$integ_report, unit_report=$unit_report"
           total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
           integ_rate=$(get_branch "$integ_report")
@@ -177,5 +177,5 @@ jobs:
         run: |
           find . | grep -v .git/
           find . -iname coverage.cobertura.xml
-          find . -iname coverage.cobertura.xml | grep "\.IntegrationTest"
-          find . -iname coverage.cobertura.xml | grep "\.Test"
+          find . -iname coverage.cobertura.xml | grep "\.IntegrationTest" || true
+          find . -iname coverage.cobertura.xml | grep "\.Test" || true
