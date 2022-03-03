@@ -174,4 +174,8 @@ jobs:
 
       - name: List files in case of failure
         if: failure()
-        run: find .
+        run: |
+          find . | grep -v .git/
+          find . -iname coverage.cobertura.xml
+          find . -iname coverage.cobertura.xml | grep "\.IntegrationTest"
+          find . -iname coverage.cobertura.xml | grep "\.Test"
