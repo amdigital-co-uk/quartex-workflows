@@ -20,6 +20,9 @@ on:
       AWS_REGION:
         type: string
         default: us-east-1
+      DEBUG:
+        type: string
+        default: FALSE
     secrets:
       PKG_TOKEN:
         required: true
@@ -86,6 +89,7 @@ jobs:
           COVERAGE_S3_PATH: ${{ inputs.COVERAGE_S3_PATH }}
           NEVER_FAIL_AT: ${{ inputs.NEVER_FAIL_AT }}
           PERSIST: false
+          DEBUG: ${{ inputs.DEBUG }}
         run: |
           # Utility Functions
           get_branch() {
@@ -103,6 +107,10 @@ jobs:
                   echo $record
           }
 
+          log_debug() {
+            [ "$DEBUG" = "true" ] && echo $@
+          }
+
           # Set behaviour based on current branch
           [ "$BRANCH" = "main" ] && PERSIST=true
           [ "$BRANCH" = "main" ] || BRANCH=latest
@@ -111,13 +119,17 @@ jobs:
 
           if [ ! -f "coverage.csv" ]
           then
+              log_debug "coverage.csv not present, creating placeholder"
               echo "Repository,Branch,Total Branch Rate,Integration Branch Rate,Unit Branch Rate"  > coverage.csv
               PERSIST=true
+          else
+              log_debug "coverage.csv downloaded OK"
           fi
 
           # Parse current branch coverage
           integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest")
           unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test")
+          log_debug "integ_report=$integ_report, unit_report=$unit_report"
           total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
           integ_rate=$(get_branch "$integ_report")
           unit_rate=$(get_branch "$unit_report")
@@ -126,6 +138,7 @@ jobs:
 
           # Parse historic coverage and cross-check
           record=$(get_record "$REPO" "main" "latest")
+          log_debug "$record"
 
           if [ -n "$record" ]
           then
