@@ -172,3 +172,6 @@ jobs:
 
           exit 0
 
+      - name: List files in case of failure
+        if: failure()
+        run: find .
