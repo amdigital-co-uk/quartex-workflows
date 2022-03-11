@@ -1,5 +1,8 @@
 # Run unit tests
 name: Run XUnit Tests
+permissions:
+  id-token: write
+  contents: read
 
 # Define Parameters
 on:
@@ -26,10 +29,8 @@ on:
     secrets:
       PKG_TOKEN:
         required: true
-      AWS_ACCESS_KEY_ID:
-        required: false
-      AWS_SECRET_ACCESS_KEY:
-        required: false
+      AWS_ROLE_ARN:
+        required: true
 
 jobs:
   xunit:
@@ -77,8 +78,8 @@ jobs:
         if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
           aws-region: ${{ inputs.AWS_REGION }}
 
       - name: Check Branch Coverage against historic data
