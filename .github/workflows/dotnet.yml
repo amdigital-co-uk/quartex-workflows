@@ -1,5 +1,8 @@
 # CI workflow for Quartex .NET application
 name: Build and Package
+permissions:
+  id-token: write
+  contents: read
 
 # Define triggers for when the workflow will run
 on:
@@ -36,9 +39,7 @@ on:
     secrets:
       PKG_TOKEN:
         required: true
-      AWS_ACCESS_KEY_ID:
-        required: true
-      AWS_SECRET_ACCESS_KEY:
+      AWS_ROLE_ARN:
         required: true
 
 jobs:
@@ -96,8 +97,8 @@ jobs:
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
           aws-region: ${{ inputs.ECR_REGION_1 }}
       - name: Login to Amazon ECR (us-east-1)
         id: login-ecr-1
@@ -108,8 +109,8 @@ jobs:
         if: ${{ inputs.ECR_REGION_2 != '' }}
         uses: aws-actions/configure-aws-credentials@v1
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
           aws-region: ${{ inputs.ECR_REGION_2 }}
       - name: Login to Amazon ECR (us-east-2)
         if: ${{ inputs.ECR_REGION_2 != '' }}

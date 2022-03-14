@@ -1,10 +1,17 @@
 # Quartex Workflows
 
-This repository contains [GitHub Actions](https://docs.github.com/en/actions) workflows used by the software team behind the [Quartex](https://www.quartexcollections.com/) platform, and form part of our CI/CD pipeline. This repository is public (as it is the only way Workflows can be be shared between repositories), although most of our other repositories are not.
+## Overview
 
-# Calling standard workflows for .NET code
+This repository contains workflows used by the software team behind the [Quartex](https://www.quartexcollections.com/) platform, and form part of our CI/CD pipeline. This repository is public (as it is the only way Workflows can be be shared between repositories), although most of our other repositories are not.
 
-Note that the secrets are defined at organisation level, so shouldn't need defining within the repository, but they do need to be passed in to the called workflow.
+## Built with
+
+- [GitHub Actions](https://docs.github.com/en/actions)
+- [bash](https://www.gnu.org/software/bash/)
+
+# Usage
+
+Note that our secrets are defined at organisation level. So whilst shouldn't need defining within the repository, they do need to be explicitly passed in to the called workflow.
 
 ## Run .NET Core automated tests via XUnit
 
@@ -25,14 +32,14 @@ jobs:
 
 ### Check branch coverage against historic data
 
-Alternatively, when omitting `BRANCH_THRESHOLD` you can instead set the following parameters and secret values, to have the workflow check current test coverage against the last recorded test coverage for the same repository (test coverage values are stored in a CSV in S3 at the configured location).
+Alternatively, when omitting `BRANCH_THRESHOLD` you can instead set the following parameters and secret values, to have the workflow check current test coverage against the last recorded test coverage for the same repository (test coverage values are stored in a CSV in S3 at the configured location). This is why we need to pass AWS authentication details to this workflow.
 
 If coverage goes down, you see a failure; if it is maintained or improved, the new value will be persisted back to S3 as the new threshold for future runs.
 
 ```yml
 jobs:
   xunit:
-    uses: amdigital-co-uk/quartex-workflows/.github/workflows/xunit.yml@v2
+    uses: amdigital-co-uk/quartex-workflows/.github/workflows/xunit.yml@v3
     with:
       DOCKER_COMPOSE: Quartex.Sample.Service.IntegrationTests/docker-compose.yml
       COVERAGE_S3_PATH: s3://my-s3-bucket/code-coverage-reporting/my-repo.csv # this path should be a unique CSV file for each repo
@@ -40,8 +47,7 @@ jobs:
       NEVER_FAIL_AT: 99     # default is 95
     secrets:
       PKG_TOKEN: ${{ secrets.PKG_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ROLE_ARN: ${{ secrets.PIPELINE_TESTS_ARN }}
 ```
 
 ## Create and push NuGet packages to private GitHub packages feed
@@ -66,7 +72,7 @@ Note this assumes our standard format of `Dockerfile`.
 jobs:
   dotnet:
     if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
-    uses: amdigital-co-uk/quartex-workflows/.github/workflows/dotnet.yml@v1
+    uses: amdigital-co-uk/quartex-workflows/.github/workflows/dotnet.yml@v3
     with:
       REF: ${{ github.ref }}
       PROJECT: Quartex.Sample.Service
@@ -78,6 +84,9 @@ jobs:
       ECR_REGION_2: us-east-2
     secrets:
       PKG_TOKEN: ${{ secrets.PKG_TOKEN }}
-      AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-      AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+      AWS_ROLE_ARN: ${{ secrets.PIPELINE_ECR_ARN }}
 ```
+
+# Contributing
+
+See further details on [contributing](./CONTRIBUTING.md)
