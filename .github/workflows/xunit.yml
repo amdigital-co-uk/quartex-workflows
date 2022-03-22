@@ -94,7 +94,7 @@ jobs:
         run: |
           # Utility Functions
           log_debug() {
-            [ "$DEBUG" = "true" ] && echo $@
+            if [ "$DEBUG" = "true" ]; then echo $@; fi
           }
           get_branch() {
               if [ -f "$1" ]; then
