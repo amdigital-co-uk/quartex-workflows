@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REF: ${{ inputs.REF }}
-      DK_TAG: ${{ inputs.DK_TAG }}
+      STAGE: ${{ inputs.STAGE }}
     steps:
       # Checks-out repository
       - name: Checkout repository
