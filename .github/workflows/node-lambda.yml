@@ -16,10 +16,9 @@ on:
       DK_IMAGE:     # Docker Image
         required: true
         type: string
-      DK_TAG:       # Default Docker tag: - this should be latest in most cases
+      STAGE:       # Serverless Stage - Also used for DK_TAG
         required: true
         type: string
-        default: latest
       ECR_REGION_1: # Primary AWS ECR region
         required: true
         type: string
@@ -61,14 +60,12 @@ jobs:
             SCC_BRANCH=$REF
             echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
           fi
-          [[ "$SCC_BRANCH" == feature/* ]] && DK_TAG=feature-$(echo ${SCC_BRANCH#feature/})
-          [[ "$SCC_BRANCH" == bug/* ]] && DK_TAG=fix-$(echo ${SCC_BRANCH#bug/})
-          [[ "$SCC_BRANCH" == release/* ]] && DK_TAG=release-$(echo ${SCC_BRANCH#release/})
-          [[ "$SCC_TAG" == v* ]] && DK_TAG=$SCC_TAG
+          [[ "$SCC_BRANCH" == stage/* ]] && STAGE=$(echo ${SCC_BRANCH#stage/})
+          [[ "$SCC_TAG" == v* ]] && STAGE=$SCC_TAG
           echo "BRANCH=$SCC_BRANCH"
           echo "TAG=$SCC_TAG"
-          echo "DK_TAG=$DK_TAG"
-          echo "DK_TAG=$DK_TAG" >> $GITHUB_ENV
+          echo "STAGE=$STAGE"
+          echo "STAGE=$STAGE" >> $GITHUB_ENV
       
       # Login to ECR_REGION_1
       # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
@@ -104,10 +101,10 @@ jobs:
           DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
-          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
-          docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
-          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
-          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
+          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+          docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$STAGE
       
       # Setup Node
       - name: Setup Node and NPM
@@ -121,8 +118,8 @@ jobs:
 
       # Package up the application
       - name: Package 
-        run: serverless package --stage $DK_TAG
+        run: serverless package --stage $STAGE
 
       # Deploy the previously created package
       - name: Deploy package
-        run: serverless deploy --package .serverless --stage $DK_TAG
+        run: serverless deploy --package .serverless --stage $STAGE
