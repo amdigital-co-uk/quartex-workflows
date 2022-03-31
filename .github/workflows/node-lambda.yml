@@ -1,0 +1,125 @@
+# CI workflow for 
+name: Build and Deploy Function
+permissions:
+  id-token: write
+  contents: read
+
+# Define triggers for when the workflow will run
+on:
+  workflow_call:
+    inputs:
+      REF:
+        type: string
+      DK_NAMESPACE: # Docker Namespace: Typically this will be 'qtfn' for a lambda function
+        required: true
+        type: string
+      DK_IMAGE:     # Docker Image
+        required: true
+        type: string
+      STAGE:       # Serverless Stage - Also used for DK_TAG
+        required: true
+        type: string
+      ECR_REGION_1: # Primary AWS ECR region
+        required: true
+        type: string
+      ECR_REGION_2: # Secondary AWS ECR region to push the Docker image to (optional)
+        type: string
+      NODE_VERSION:
+        type: string
+        default: '14.x'
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  build:
+    name: Build and Deploy
+    runs-on: ubuntu-latest
+    env:
+      REF: ${{ inputs.REF }}
+      STAGE: ${{ inputs.STAGE }}
+    steps:
+      # Checks-out repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+        with:
+          ref: ${{ env.REF }}
+
+      # Determine correct Docker tag and Stage based on branch/release
+      - name: Set tag based on branch
+        run: |
+          if [[ "$REF" == refs/heads/* ]]
+          then
+            SCC_BRANCH=$(echo ${REF#refs/heads/})
+            echo "Branch/Tag parsing: HEAD case -- REF=$REF"
+          elif [[ "$REF" == refs/tags/* ]]
+          then
+            SCC_TAG=$(echo ${REF#refs/tags/})
+            echo "Branch/Tag parsing: TAG case -- REF=$REF"
+          else
+            SCC_BRANCH=$REF
+            echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
+          fi
+          [[ "$SCC_BRANCH" == stage/* ]] && STAGE=$(echo ${SCC_BRANCH#stage/})
+          [[ "$SCC_TAG" == v* ]] && STAGE=$SCC_TAG
+          echo "BRANCH=$SCC_BRANCH"
+          echo "TAG=$SCC_TAG"
+          echo "STAGE=$STAGE"
+          echo "STAGE=$STAGE" >> $GITHUB_ENV
+      
+      # Login to ECR_REGION_1
+      # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.ECR_REGION_1 }}
+      - name: Login to Amazon ECR (us-east-1)
+        id: login-ecr-1
+        uses: aws-actions/amazon-ecr-login@v1
+        
+      # Login to ECR_REGION_2
+      - name: Configure AWS credentials (ECR_REGION_2)
+        if: ${{ inputs.ECR_REGION_2 != '' }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.ECR_REGION_2 }}
+      - name: Login to Amazon ECR (us-east-2)
+        if: ${{ inputs.ECR_REGION_2 != '' }}
+        id: login-ecr-2
+        uses: aws-actions/amazon-ecr-login@v1
+          
+      # Build container via Docker & push to ECR
+      - name: Build Docker Image
+        id: build
+        env:
+          DK_NAMESPACE: ${{ inputs.DK_NAMESPACE }}
+          DK_IMAGE: ${{ inputs.DK_IMAGE }}
+          DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
+          DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
+        run: |
+          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+          docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$STAGE
+      
+      # Setup Node
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+      
+      # Install serverless node package
+      - name: Install serverless
+        run: npm i -g serverless
+
+      # Package up the application
+      - name: Package 
+        run: serverless package --stage $STAGE
+
+      # Deploy the previously created package
+      - name: Deploy package
+        run: serverless deploy --package .serverless --stage $STAGE
