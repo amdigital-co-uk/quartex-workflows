@@ -87,6 +87,37 @@ jobs:
       AWS_ROLE_ARN: ${{ secrets.PIPELINE_ECR_ARN }}
 ```
 
+## Build, Package, and Publish a NodeJS Lambda function using Docker and Serverless
+
+```yml
+name: Deployment
+
+# Define triggers for when the workflow will run
+on:
+  pull_request:
+    branches: 
+      - 'main'
+      - 'stage/*'
+    types: [closed]
+  
+  # Allows manual triggering
+  workflow_dispatch:
+
+jobs:
+  build:
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
+    uses: amdigital-co-uk/quartex-workflows/.github/workflows/node-lambda.yml@v4
+    with:
+      REF: ${{ github.ref }}
+      DK_NAMESPACE: qtfn
+      DK_IMAGE: sample-docker-image
+      STAGE: live
+      ECR_REGION_1: us-east-1
+      ECR_REGION_2: us-east-2
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.PIPELINE_ADMIN_ARN }}
+```
+
 # Contributing
 
 See further details on [contributing](./CONTRIBUTING.md)

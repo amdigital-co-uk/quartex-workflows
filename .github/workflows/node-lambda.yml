@@ -33,7 +33,7 @@ on:
 
 jobs:
   build:
-    name: Test, Build and Package
+    name: Build and Deploy
     runs-on: ubuntu-latest
     env:
       REF: ${{ inputs.REF }}
