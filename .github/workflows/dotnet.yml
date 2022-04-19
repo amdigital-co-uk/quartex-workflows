@@ -89,7 +89,7 @@ jobs:
           token: ${{ secrets.SRC_TOKEN }}
           path: config
       - name: Copy shared configuration into project
-        if: ${{ inputs.CONFIGS == 'true' }}
+        if: ${{ inputs.CONFIGS != '' }}
         run: cp config/*/*.json $PROJECT
 
       # Login to ECR_REGION_1
