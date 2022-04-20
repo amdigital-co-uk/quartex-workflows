@@ -37,6 +37,7 @@ on:
         type: boolean
         default: false
     secrets:
+      SRC_TOKEN:
       PKG_TOKEN:
         required: true
       AWS_ROLE_ARN:
