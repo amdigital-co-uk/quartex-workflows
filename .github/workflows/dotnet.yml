@@ -37,8 +37,6 @@ on:
         type: boolean
         default: false
     secrets:
-      SRC_TOKEN:
-        required: false
       PKG_TOKEN:
         required: true
       AWS_ROLE_ARN:
@@ -88,7 +86,6 @@ jobs:
         uses: actions/checkout@v2
         with:
           repository: ${{ inputs.CONFIGS }}
-          token: ${{ secrets.SRC_TOKEN }}
           path: config
       - name: Copy shared configuration into project
         if: ${{ inputs.CONFIGS != '' }}
