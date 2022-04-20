@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       CONFIGS:      # Configuration repository name: Populate if raw config files are required by the application
-        type: boolean
+        type: string
       DK_NAMESPACE: # Docker Namespace: Typically this will be 'qtms' for a microservice or 'qtui' for a webapp
         required: true
         type: string
