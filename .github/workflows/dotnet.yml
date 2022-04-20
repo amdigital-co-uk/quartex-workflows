@@ -92,7 +92,7 @@ jobs:
           path: config
       - name: Copy shared configuration into project
         if: ${{ inputs.CONFIGS != '' }}
-        run: cp config/*/*.json $PROJECT
+        run: cp config/*/*.json ${{ inputs.PROJECT }}
 
       # Login to ECR_REGION_1
       # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
