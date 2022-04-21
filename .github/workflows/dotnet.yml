@@ -17,7 +17,7 @@ on:
         required: true
         type: string
       CONFIGS:      # Configuration repository name: Populate if raw config files are required by the application
-        type: boolean
+        type: string
       DK_NAMESPACE: # Docker Namespace: Typically this will be 'qtms' for a microservice or 'qtui' for a webapp
         required: true
         type: string
@@ -37,6 +37,8 @@ on:
         type: boolean
         default: false
     secrets:
+      SRC_TOKEN:
+        required: false
       PKG_TOKEN:
         required: true
       AWS_ROLE_ARN:
@@ -89,8 +91,8 @@ jobs:
           token: ${{ secrets.SRC_TOKEN }}
           path: config
       - name: Copy shared configuration into project
-        if: ${{ inputs.CONFIGS == 'true' }}
-        run: cp config/*/*.json $PROJECT
+        if: ${{ inputs.CONFIGS != '' }}
+        run: cp config/*/*.json ${{ inputs.PROJECT }}
 
       # Login to ECR_REGION_1
       # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions

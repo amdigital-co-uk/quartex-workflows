@@ -82,8 +82,10 @@ jobs:
       DK_TAG: latest
       ECR_REGION_1: us-east-1
       ECR_REGION_2: us-east-2
+      CONFIGS: org/config-repo # Optional: specify a repo to checkout and retrieve JSON configs from
     secrets:
       PKG_TOKEN: ${{ secrets.PKG_TOKEN }}
+      SRC_TOKEN: ${{ github.token }} # Must be specified if CONFIGS is set; must be a token that has read access to the repo
       AWS_ROLE_ARN: ${{ secrets.PIPELINE_ECR_ARN }}
 ```
 
