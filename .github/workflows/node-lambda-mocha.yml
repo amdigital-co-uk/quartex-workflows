@@ -1,0 +1,65 @@
+# Run unit tests
+name: Run Mocha Unit Tests
+permissions:
+  id-token: write
+  contents: read
+
+# Define Parameters
+on:
+  workflow_call:
+    inputs:
+      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
+                        # If NOT populated, use historic data from previous runs as the threshold.
+                        # Historic data stored in S3, so the AWS secrets must be populated in this instance
+        type: number
+        default: 0
+      COVERAGE_S3_PATH: # S3 path of the CSV that stores historic coverage data (file can contain multiple repos/branches)
+        type: string
+      NEVER_FAIL_AT:
+        type: number
+        default: 95
+      AWS_REGION:
+        type: string
+        default: us-east-1
+      DEBUG:
+        type: string
+        default: FALSE
+      NODE_VERSION:
+        type: string
+        default: '14.x'
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  xunit:
+    name: Run Mocha Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Setup Node
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+    
+      # Run Unit Tests
+      - name: Run Unit Tests
+        run: npm run test:coverage
+
+      # Compare against static threshold (BRANCH_THRESHOLD is populated)
+      - name: Check Branch Coverage against static threshold
+        if: ${{ inputs.BRANCH_THRESHOLD > 0 }}
+        uses: amdigital-co-uk/code-coverage-action@v1.0
+        with:
+          path: ${{ github.workspace }}/coverage/cobertura-coverage.xml
+          branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
+
+      - name: List files in case of failure
+        if: failure()
+        run: |
+          find . -iname cobertura-coverage.xml
+          find . | grep -v .git/
