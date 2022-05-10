@@ -48,7 +48,7 @@ jobs:
     
       # Run Unit Tests
       - name: Run Unit Tests
-        run: npm run test:coverage
+        run: npm install && npm run test:coverage
 
       # Compare against static threshold (BRANCH_THRESHOLD is populated)
       - name: Check Branch Coverage against static threshold
