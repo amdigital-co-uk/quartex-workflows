@@ -27,10 +27,6 @@ on:
       NODE_VERSION:
         type: string
         default: '14.x'
-      BUILD_NPMRC:
-        required: false
-        type: boolean
-        default: false
     secrets:
       PKG_TOKEN:
         required: true
