@@ -27,7 +27,13 @@ on:
       NODE_VERSION:
         type: string
         default: '14.x'
+      BUILD_NPMRC:
+        required: false
+        type: boolean
+        default: false
     secrets:
+      PKG_TOKEN:
+        required: true
       AWS_ROLE_ARN:
         required: true
 
@@ -87,11 +93,21 @@ jobs:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
           role-duration-seconds: 900
           aws-region: ${{ inputs.ECR_REGION_2 }}
+          
       - name: Login to Amazon ECR (us-east-2)
         if: ${{ inputs.ECR_REGION_2 != '' }}
         id: login-ecr-2
         uses: aws-actions/amazon-ecr-login@v1
           
+      # Npmrc Setup
+      - name: Npm Access Setup
+        id: npmrcsetup
+        run: |
+          cat >.npmrc <<EOL
+          //npm.pkg.github.com/:_authToken=${{ secrets.PKG_TOKEN }}
+          @amdigital-co-uk:registry=https://npm.pkg.github.com/
+          EOL
+      
       # Build container via Docker & push to ECR
       - name: Build Docker Image
         id: build

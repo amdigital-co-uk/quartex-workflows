@@ -28,6 +28,8 @@ on:
         type: string
         default: '14.x'
     secrets:
+      PKG_TOKEN:
+        required: true
       AWS_ROLE_ARN:
         required: true
 
@@ -45,6 +47,15 @@ jobs:
         uses: actions/setup-node@v3
         with:
           node-version: ${{ inputs.NODE_VERSION }}
+
+      # Npmrc Setup
+      - name: Npm Access Setup
+        id: npmrcsetup
+        run: |
+          cat >.npmrc <<EOL
+          //npm.pkg.github.com/:_authToken=${{ secrets.PKG_TOKEN }}
+          @amdigital-co-uk:registry=https://npm.pkg.github.com/
+          EOL
     
       # Run Unit Tests
       - name: Run Unit Tests
