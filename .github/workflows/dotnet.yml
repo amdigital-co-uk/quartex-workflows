@@ -36,6 +36,10 @@ on:
         required: false
         type: boolean
         default: false
+      DK_FILE:
+        required: false
+        type: string
+        default: Dockerfile
     secrets:
       SRC_TOKEN:
         required: false
@@ -143,13 +147,14 @@ jobs:
         env:
           COMPONENT: ${{ inputs.COMPONENT }}
           PROJECT: ${{ inputs.PROJECT }}
+          DK_FILE: ${{ inputs.DK_FILE }}
           DK_NAMESPACE: ${{ inputs.DK_NAMESPACE }}
           DK_IMAGE: ${{ inputs.DK_IMAGE }}
           DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
           cp ../nuget.config .          
-          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT
+          docker build . -f $DK_FILE -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
