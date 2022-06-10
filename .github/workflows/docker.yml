@@ -17,8 +17,9 @@ on:
         required: true
         type: string
       DK_TAG:       # Docker Tag
-        required: true
+        required: false
         type: string
+        default: 'latest'
       DK_CONTEXT:
         required: false
         type: string
