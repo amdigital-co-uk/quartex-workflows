@@ -16,20 +16,26 @@ on:
       DK_IMAGE:     # Docker Image
         required: true
         type: string
-      STAGE:       # Serverless Stage - Also used for DK_TAG
-        required: true
+      DK_TAG:       # Docker Tag
+        required: false
         type: string
+        default: 'latest'
+      WORKDIR:
+        required: false
+        type: string
+        default: '.'
       ECR_REGION_1: # Primary AWS ECR region
         required: true
         type: string
       ECR_REGION_2: # Secondary AWS ECR region to push the Docker image to (optional)
         type: string
-      NODE_VERSION:
-        type: string
-        default: '14.x'
+      BUILD_NPMRC:
+        required: false
+        type: boolean
+        default: false
     secrets:
       PKG_TOKEN:
-        required: true
+        required: false
       AWS_ROLE_ARN:
         required: true
 
@@ -39,7 +45,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       REF: ${{ inputs.REF }}
-      STAGE: ${{ inputs.STAGE }}
+      TAG: ${{ inputs.DK_TAG }}
     steps:
       # Checks-out repository
       - name: Checkout repository
@@ -47,7 +53,8 @@ jobs:
         with:
           ref: ${{ env.REF }}
 
-      # Determine correct Docker tag and Stage based on branch/release
+      # Determine correct Docker tag based on branch/release
+      ## NOTE: using the stage/* & main branching strategy
       - name: Set tag based on branch
         run: |
           if [[ "$REF" == refs/heads/* ]]
@@ -62,12 +69,11 @@ jobs:
             SCC_BRANCH=$REF
             echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
           fi
-          [[ "$SCC_BRANCH" == stage/* ]] && STAGE=$(echo ${SCC_BRANCH#stage/})
-          [[ "$SCC_TAG" == v* ]] && STAGE=$SCC_TAG
+          [[ "$SCC_BRANCH" == stage/* ]] && TAG=$(echo ${SCC_BRANCH#stage/})
+          [[ "$SCC_TAG" == v* ]] && TAG=$SCC_TAG
           echo "BRANCH=$SCC_BRANCH"
-          echo "TAG=$SCC_TAG"
-          echo "STAGE=$STAGE"
-          echo "STAGE=$STAGE" >> $GITHUB_ENV
+          echo "TAG=$TAG"
+          echo "TAG=$TAG" >> $GITHUB_ENV
       
       # Login to ECR_REGION_1
       # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
@@ -97,8 +103,10 @@ jobs:
           
       # Npmrc Setup
       - name: Npm Access Setup
+        if: ${{ inputs.BUILD_NPMRC == true }}
         id: npmrcsetup
         run: |
+          cd ${{ inputs.WORKDIR }}
           cat >.npmrc <<EOL
           //npm.pkg.github.com/:_authToken=${{ secrets.PKG_TOKEN }}
           @amdigital-co-uk:registry=https://npm.pkg.github.com/
@@ -113,25 +121,8 @@ jobs:
           DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
-          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE
-          docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE
-          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$STAGE $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$STAGE
-          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$STAGE
-      
-      # Setup Node
-      - name: Setup Node and NPM
-        uses: actions/setup-node@v3
-        with:
-          node-version: ${{ inputs.NODE_VERSION }}
-      
-      # Install serverless node package
-      - name: Install serverless
-        run: npm i -g serverless
-
-      # Package up the application
-      - name: Package 
-        run: serverless package --stage $STAGE
-
-      # Deploy the previously created package
-      - name: Deploy package
-        run: serverless deploy --package .serverless --stage $STAGE
+          cd ${{ inputs.WORKDIR }}
+          docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG

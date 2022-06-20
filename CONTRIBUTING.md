@@ -32,3 +32,16 @@ git push origin v3
 git tag --delete v2.1.0-alpha
 git push --delete origin v2.1.0-alpha
 ```
+
+# Future work & improvements
+
+The lengthy bash script to perform historical code coverage checking needs to be refactored somehow, likely as a [re-usable composite action](https://docs.github.com/en/actions/creating-actions/creating-a-composite-action). Used by:
+
+* `node-tests.yml`
+* `xunit.yml`
+
+Likewise, the (slightly shorter) bash script to parse current GitHub branch/ref/head and determine the current feature branch/tag name needs to be refactored. Ideally it would accept an input detailing which branching strategy is in-use (or a map of branch name formats to tag formats). Used by:
+
+* `docker.yml`
+* `dotnet.yml`
+* `serverless.yml`
