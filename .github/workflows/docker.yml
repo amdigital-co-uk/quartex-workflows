@@ -20,7 +20,7 @@ on:
         required: false
         type: string
         default: 'latest'
-      DK_CONTEXT:
+      WORKDIR:
         required: false
         type: string
         default: '.'
@@ -106,7 +106,7 @@ jobs:
         if: ${{ inputs.BUILD_NPMRC == true }}
         id: npmrcsetup
         run: |
-          cd ${{ inputs.DK_CONTEXT }}
+          cd ${{ inputs.WORKDIR }}
           cat >.npmrc <<EOL
           //npm.pkg.github.com/:_authToken=${{ secrets.PKG_TOKEN }}
           @amdigital-co-uk:registry=https://npm.pkg.github.com/
@@ -121,7 +121,7 @@ jobs:
           DK_REG_1: ${{ steps.login-ecr-1.outputs.registry }}
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
-          cd ${{ inputs.DK_CONTEXT }}
+          cd ${{ inputs.WORKDIR }}
           docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
           [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG

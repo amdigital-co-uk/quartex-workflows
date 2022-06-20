@@ -16,6 +16,7 @@ jobs:
       DK_NAMESPACE: samples
       DK_IMAGE: sample-docker-image
       DK_TAG: live # default tag to use when there
+      WORKDIR: api # working directory (if not the root of the repo), which should contain the Dockerfile
       BUILD_NPMRC: true
       ECR_REGION_1: us-east-1
       ECR_REGION_2: us-east-2
