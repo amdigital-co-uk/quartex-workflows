@@ -1,0 +1,161 @@
+# Run unit tests
+name: Terraform Plan
+permissions:
+  id-token: write
+  issues: write
+  pull-requests: write
+  contents: read
+  
+# Define Parameters
+on:
+  workflow_call:
+    inputs:
+      COMPONENT:
+        type: string
+      PLAN_ID:
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  tf-plan:
+    name: Terraform Plan
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set workspace based on branch
+        env:
+          REF: ${{ github.ref_name }}
+          TARGET: ${{ github.base_ref }}
+        run: |
+          [ -n "$REF" ] && BRANCH=$REF
+          [ -n "$TARGET" ] && BRANCH=$TARGET
+          echo "Working out namespace on basis of REF=$REF, TARGET=$TARGET, BRANCH=$BRANCH"
+          [[ "$BRANCH" == env/* ]] && WORKSPACE=$(echo $BRANCH | cut -d/ -f2)
+          [ "$BRANCH" == main ] && WORKSPACE=prod
+          [ -z "$WORKSPACE" ] && echo "::error::Could not set workspace" && exit 1
+          echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
+          echo "WORKSPACE=$WORKSPACE"
+
+      - name: Check tfvars file exists
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          [ -f "envs/$TF_WORKSPACE.tfvars" ] || echo "::error title=Missing workspace file::No tfvars file found for the workspace"
+          [ -f "envs/$TF_WORKSPACE.tfvars" ] || exit 1
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.1.5
+          terraform_wrapper: false
+
+      - name: Terraform Init
+        id: bootstrapping
+        working-directory: components/${{ inputs.COMPONENT }}
+        run: |
+          terraform init
+          terraform workspace list
+      
+      - name: Setup workspace
+        working-directory: components/${{ inputs.COMPONENT }}
+        run: terraform workspace new $WORKSPACE
+        continue-on-error: true
+      
+      - name: Terraform Format
+        id: fmt
+        working-directory: components/${{ inputs.COMPONENT }}
+        run: terraform fmt -check
+
+      - name: Terraform Init
+        id: init
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: terraform init
+
+      - name: Terraform Validate
+        id: validate
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: terraform validate
+
+      - name: Get Secrets from SSM
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: aws secretsmanager get-secret-value --secret-id "terraform/${{ inputs.COMPONENT }}/$TF_WORKSPACE" --query SecretString --output text > envs/secrets.tfvars
+        continue-on-error: true
+
+      - name: Terraform Plan
+        id: plan
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: |
+          terraform plan -no-color -var-file=envs/$TF_WORKSPACE.tfvars -var-file=envs/secrets.tfvars -out "${{ inputs.PLAN_ID }}.tfplan" | tee ../../plan.out
+          aws s3 cp "${{ inputs.PLAN_ID }}.tfplan" "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$TF_WORKSPACE/${{ inputs.PLAN_ID }}.tfplan"
+          
+      - name: Format plan
+        id: format-plan
+        run: |
+          length=$(cat plan.out | wc -c)
+          echo "Plan length is $length"
+          if [ $length -gt 65000 ]
+          then
+            echo "Formatting and truncating plan"
+            cat plan.out | grep "^Plan: \|^No changes.\|^Changes to Outputs:" | head -n1 > summary.out
+            cat plan.out | grep -v "Refreshing state..." | head -c64500 > plan2.out
+            echo "...truncated..." >> plan2.out
+            mv plan2.out plan.out
+          else
+          echo "Formatting plan"
+            cat plan.out | grep "^Plan: \|^No changes.\|^Changes to Outputs:" | head -n1 > summary.out
+            cat plan.out | grep -v "^Plan: \|^No changes." | grep -v "Refreshing state..." > plan2.out
+            mv plan2.out plan.out
+          fi
+
+      - name: Post plan as a comment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const plan = fs.readFileSync('plan.out');
+            const summary = fs.readFileSync('summary.out');
+            const output = `### Infrastructure plan: ${{ inputs.COMPONENT }}
+            #### Terraform Format and Style 🖌\`${{ steps.fmt.outcome }}\`
+            #### Terraform Initialization ⚙️\`${{ steps.init.outcome }}\`
+            #### Terraform Validation 🤖\`${{ steps.validate.outcome }}\`
+            #### Terraform Plan 📖\`${{ steps.plan.outcome }}\`
+
+            <details><summary>${summary}</summary>
+
+            \`\`\`\n
+            ${plan}
+            \`\`\`
+
+            </details>`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+      - name: Terraform Plan Status
+        if: steps.plan.outcome == 'failure'
+        run: exit 1
+        
