@@ -1,0 +1,115 @@
+# Run unit tests
+name: Terraform Apply
+permissions:
+  id-token: write
+  issues: write
+  pull-requests: write
+  contents: read
+  
+# Define Parameters
+on:
+  workflow_call:
+    inputs:
+      COMPONENT:
+        type: string
+      PLAN_ID:
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  tf-plan:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v2
+
+      - name: Set workspace based on branch
+        env:
+          REF: ${{ github.ref_name }}
+          TARGET: ${{ github.base_ref }}
+        run: |
+          [ -n "$REF" ] && BRANCH=$REF
+          [ -n "$TARGET" ] && BRANCH=$TARGET
+          echo "Working out namespace on basis of REF=$REF, TARGET=$TARGET, BRANCH=$BRANCH"
+          [[ "$BRANCH" == env/* ]] && WORKSPACE=$(echo $BRANCH | cut -d/ -f2)
+          [ "$BRANCH" == main ] && WORKSPACE=prod
+          [ -z "$WORKSPACE" ] && echo "::error::Could not set workspace" && exit 1
+          echo "WORKSPACE=$WORKSPACE" >> $GITHUB_ENV
+          echo "WORKSPACE=$WORKSPACE"
+      
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: us-east-1
+          mask-aws-account-id: 'no'
+          
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v1
+        with:
+          terraform_version: 1.1.5
+          terraform_wrapper: false
+          
+      - name: Retreive terraform plan
+        working-directory: components/${{ inputs.COMPONENT }}
+        run: aws s3 cp "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$WORKSPACE/${{ inputs.PLAN_ID }}.tfplan" "${{ inputs.PLAN_ID }}.tfplan"
+      
+      - name: Terraform Init
+        id: init
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: terraform init
+
+      - name: Apply terraform plan
+        working-directory: components/${{ inputs.COMPONENT }}
+        env:
+          TF_WORKSPACE: ${{ env.WORKSPACE }}
+        run: terraform apply -no-color "${{ inputs.PLAN_ID }}.tfplan" | tee ../../apply.out
+      
+      - name: Format output
+        id: format-output
+        run: |
+          length=$(cat apply.out | wc -c)
+          has_op=$(cat apply.out | (grep "Outputs:" || echo -n) | wc -l)
+          if [ "$has_op" = "0" ]
+          then
+              echo "No outputs created as part of these resources" > outputs.out
+          else
+              cat apply.out | sed -n -e '/Outputs:/,$p' | head -c64500 > outputs.out
+          fi
+
+      - name: Post outputs as a comment
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const fs = require('fs');
+            const outputs = fs.readFileSync('outputs.out');
+
+            const output = `## Terraform Outputs
+            <details><summary>Expand</summary>
+
+            \`\`\`
+            ${outputs}
+            \`\`\`
+            
+            </details>
+
+            *Pusher: @${{ github.actor }}, Action: \`${{ github.event_name }}\`*`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            })
+
+      - name: Delete unused plan on failure
+        if: failure()
+        run: aws s3 rm "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$WORKSPACE/${{ inputs.PLAN_ID }}.tfplan"
+          
+        
