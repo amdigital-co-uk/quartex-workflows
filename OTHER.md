@@ -22,7 +22,7 @@ jobs:
       ECR_REGION_2: us-east-2
     secrets:
       PKG_TOKEN: ${{ secrets.PKG_TOKEN }}
-      AWS_ROLE_ARN: ${{ secrets.PIPELINE_ADMIN_ARN }}
+      AWS_ROLE_ARN: ${{ secrets.PIPELINE_ECR_ARN }}
 ```
 
 ## Deploy a NodeJS Lambda function using Docker & Serverless
@@ -40,7 +40,7 @@ jobs:
       ECR_REGION_1: us-east-1
       ECR_REGION_2: us-east-2
     secrets:
-      AWS_ROLE_ARN: ${{ secrets.PIPELINE_ADMIN_ARN }}
+      AWS_ROLE_ARN: ${{ secrets.PIPELINE_LAMBDA_ARN }}
 ```
 
 ## Run unit tests for a NodeJS application
