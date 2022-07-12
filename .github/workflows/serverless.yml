@@ -19,6 +19,9 @@ on:
       NODE_VERSION:
         type: string
         default: '14.x'
+      USE_ALIAS:
+        type: boolean
+        default: false
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -78,6 +81,11 @@ jobs:
       # Install serverless node package
       - name: Install serverless
         run: npm i -g serverless
+
+      # Install serverless alias
+      - name: Install serverless-simple-alias
+        if: ${{ inputs.USE_ALIAS == true }}
+        run: serverless plugin install -n serverless-simple-alias
 
       # Package up the application
       - name: Package 
