@@ -1,0 +1,112 @@
+name: Build and deploy via Serverless
+permissions:
+  id-token: write
+  contents: read
+
+# Define triggers for when the workflow will run
+on:
+  workflow_call:
+    inputs:
+      REF:
+        type: string
+      STAGE:       # Serverless Stage - Also used for DK_TAG
+        required: true
+        type: string
+      AWS_REGION: # Primary AWS ECR region
+        required: true
+        type: string
+      NODE_VERSION:
+        type: string
+        default: '14.x'
+      PROJECT:
+        required: true
+        type: string
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+      PKG_TOKEN:
+        required: true
+
+jobs:
+  deploy:
+    name: Dotnet publish & Serverless deploy
+    runs-on: ubuntu-latest
+    env:
+      PROJECT: ${{ inputs.PROJECT }}
+      REF: ${{ inputs.REF }}
+      STAGE: ${{ inputs.STAGE }}
+    steps:
+      # Checks-out repository
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # Login to GitHub packages
+      - name: Login to GitHub packages
+        uses: actions/setup-dotnet@v1
+        with:
+          source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
+
+      # Publish .NET project and create Zip
+      - uses: actions/setup-dotnet@v2
+        with:
+          dotnet-version: '6.0.x'
+          include-prerelease: true
+      
+      - name: Publish .NET application
+        run: dotnet publish $PROJECT/$PROJECT.csproj --output _publish --configuration "Release" --framework "net6.0" /p:GenerateRuntimeConfigurationFiles=true --runtime linux-x64 --self-contained false
+      
+      - name: Create Package
+        working-directory: _publish
+        run: zip -r package . && mv package.zip ..
+
+      # Determine Stage based on branch/release
+      ## NOTE: using the stage/* & main branching strategy
+      - name: Set stage based on branch
+        run: |
+          if [[ "$REF" == refs/heads/* ]]
+          then
+            SCC_BRANCH=$(echo ${REF#refs/heads/})
+            echo "Branch/Tag parsing: HEAD case -- REF=$REF"
+          elif [[ "$REF" == refs/tags/* ]]
+          then
+            SCC_TAG=$(echo ${REF#refs/tags/})
+            echo "Branch/Tag parsing: TAG case -- REF=$REF"
+          else
+            SCC_BRANCH=$REF
+            echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
+          fi
+          [[ "$SCC_BRANCH" == stage/* ]] && STAGE=$(echo ${SCC_BRANCH#stage/})
+          [[ "$SCC_TAG" == v* ]] && STAGE=$SCC_TAG
+          echo "BRANCH=$SCC_BRANCH"
+          echo "TAG=$SCC_TAG"
+          echo "STAGE=$STAGE"
+          echo "STAGE=$STAGE" >> $GITHUB_ENV
+      
+      # Login to AWS
+      # See https://github.com/marketplace/actions/amazon-ecr-login-action-for-github-actions
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.AWS_REGION }}
+      
+      # Setup Node
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: '14.x'
+      
+      # Install serverless node package
+      - name: Install serverless
+        run: npm i -g serverless
+
+      # Package up the application
+      - name: Package 
+        run: serverless package --stage $STAGE
+
+      # Deploy the previously created package
+      - name: Deploy package
+        run: serverless deploy --package .serverless --stage $STAGE
