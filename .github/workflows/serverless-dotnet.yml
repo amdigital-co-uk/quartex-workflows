@@ -1,4 +1,4 @@
-name: Build and deploy via Serverless
+name: Dotnet publish & Serverless deploy
 permissions:
   id-token: write
   contents: read
@@ -9,10 +9,10 @@ on:
     inputs:
       REF:
         type: string
-      STAGE:       # Serverless Stage - Also used for DK_TAG
+      STAGE:       # Serverless Stage
         required: true
         type: string
-      AWS_REGION: # Primary AWS ECR region
+      AWS_REGION: # Primary AWS Lambda region
         required: true
         type: string
       NODE_VERSION:
