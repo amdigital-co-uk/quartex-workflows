@@ -167,7 +167,9 @@ jobs:
 
           # Add new coverage values and persist
           echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> coverage.csv
+          [ "$PERSIST" = "true" ] && log_debug "Copying coverage.csv to $COVERAGE_S3_PATH"
           [ "$PERSIST" = "true" ] && aws s3 cp --quiet coverage.csv $COVERAGE_S3_PATH
+          log_debug "Coverage checking passed"
 
           exit 0
 
