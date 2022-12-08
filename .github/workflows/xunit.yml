@@ -54,7 +54,7 @@ jobs:
       - name: Login to GitHub packages
         uses: actions/setup-dotnet@v3
         with:
-          dotnet-version: '5.0.x'
+          dotnet-version: ${{ inputs.DOTNET_VERSION }}
           source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
         env:
           NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
