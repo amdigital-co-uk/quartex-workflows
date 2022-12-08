@@ -40,6 +40,10 @@ on:
         required: false
         type: string
         default: Dockerfile
+      DOTNET_VERSION:
+        required: false
+        type: string
+        default: null
     secrets:
       SRC_TOKEN:
         required: false
@@ -58,7 +62,7 @@ jobs:
     steps:
       # Checks-out repository
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           ref: ${{ env.REF }}
 
@@ -89,7 +93,7 @@ jobs:
       # Checkout shared configuration (if required)
       - name: Checkout shared configuration
         if: ${{ inputs.CONFIGS != '' }}
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
         with:
           repository: ${{ inputs.CONFIGS }}
           token: ${{ secrets.SRC_TOKEN }}
@@ -125,8 +129,9 @@ jobs:
 
       # Login to GitHub packages
       - name: Login to GitHub packages
-        uses: actions/setup-dotnet@v1
-        with:
+        uses: actions/setup-dotnet@v3
+        with:          
+          dotnet-version: '5.0.x'
           source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
         env:
           NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
