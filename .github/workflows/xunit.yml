@@ -26,6 +26,10 @@ on:
       DEBUG:
         type: string
         default: FALSE
+      DOTNET_VERSION:
+        required: false
+        type: string
+        default: null
     secrets:
       PKG_TOKEN:
         required: true
@@ -39,7 +43,7 @@ jobs:
     steps:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout repository
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       
       # Spins up services via Docker-compose
       - name: Start containers
@@ -48,8 +52,9 @@ jobs:
       
       # Login to GitHub packages
       - name: Login to GitHub packages
-        uses: actions/setup-dotnet@v1
+        uses: actions/setup-dotnet@v3
         with:
+          dotnet-version: ${{ inputs.DOTNET_VERSION }}
           source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
         env:
           NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
