@@ -47,6 +47,13 @@ jobs:
         uses: actions/checkout@v3
         with:
           fetch-depth: 0
+          
+      # Static Code Analysis
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
       
       # Spins up services via Docker-compose
       - name: Start containers
@@ -62,9 +69,38 @@ jobs:
         env:
           NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
     
+      # Setup SonarCloud
+      - name: Set up JDK 11
+        uses: actions/setup-java@v1
+        with:
+          java-version: 1.11
+      - name: Cache SonarCloud packages
+        uses: actions/cache@v1
+        with:
+          path: ~\sonar\cache
+          key: ${{ runner.os }}-sonar
+          restore-keys: ${{ runner.os }}-sonar
+      - name: Cache SonarCloud scanner
+        id: cache-sonar-scanner
+        uses: actions/cache@v1
+        with:
+          path: .\.sonar\scanner
+          key: ${{ runner.os }}-sonar-scanner
+          restore-keys: ${{ runner.os }}-sonar-scanner
+      - name: Install SonarCloud scanner
+        if: steps.cache-sonar-scanner.outputs.cache-hit != 'true'
+        run: |
+          mkdir .\.sonar\scanner
+          dotnet tool update dotnet-sonarscanner --tool-path .\.sonar\scanner
+
       # Run Unit Tests
       - name: Run Unit Tests
-        run: dotnet test --collect "XPlat Code Coverage" --collect "Code Coverage"
+        run: |
+          mv sonar-project.properties sonar-project.tmp
+          .\.sonar\scanner\dotnet-sonarscanner begin /k:"amdigital-co-uk_testms-netcore2" /o:"amdigital-co-uk" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml
+          dotnet test --collect "XPlat Code Coverage" --collect "Code Coverage"
+          .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          mv sonar-project.tmp sonar-project.properties
 
       - name: Install code coverage tool
         run: dotnet tool install --global dotnet-reportgenerator-globaltool
@@ -180,13 +216,6 @@ jobs:
           log_debug "Coverage checking passed"
 
           exit 0
-          
-      # Static Code Analysis
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: List files in case of failure
         if: failure()
