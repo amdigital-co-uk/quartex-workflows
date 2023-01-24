@@ -94,19 +94,17 @@ jobs:
           dotnet tool update dotnet-sonarscanner --tool-path .sonar/scanner
 
       # Run Unit Tests
+      - name: Install code coverage tool
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+
       - name: Run Unit Tests
         run: |
           mv sonar-project.properties sonar-project.tmp
           .sonar/scanner/dotnet-sonarscanner begin /k:"amdigital-co-uk_testms-netcore2" /o:"amdigital-co-uk" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.vscoveragexml.reportsPaths=coverage.cobertura.xml
           dotnet test --collect "XPlat Code Coverage"
+          reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
           .sonar/scanner/dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
           mv sonar-project.tmp sonar-project.properties
-
-      - name: Install code coverage tool
-        run: dotnet tool install --global dotnet-reportgenerator-globaltool
-        
-      - name: Run report generation
-        run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
 
       # Compare against static threshold (BRANCH_THRESHOLD is populated)
       - name: Check Branch Coverage against static threshold
@@ -218,7 +216,7 @@ jobs:
           exit 0
 
       - name: List files in case of failure
-        if: failure()
+        #if: failure()
         run: |
           find . -iname coverage.cobertura.xml
           find . | grep -v .git/
