@@ -97,9 +97,9 @@ jobs:
       - name: Run Unit Tests
         run: |
           mv sonar-project.properties sonar-project.tmp
-          .\.sonar\scanner\dotnet-sonarscanner begin /k:"amdigital-co-uk_testms-netcore2" /o:"amdigital-co-uk" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml
+          .sonar/scanner/dotnet-sonarscanner begin /k:"amdigital-co-uk_testms-netcore2" /o:"amdigital-co-uk" /d:sonar.login="${{ secrets.SONAR_TOKEN }}" /d:sonar.host.url="https://sonarcloud.io" /d:sonar.cs.vscoveragexml.reportsPaths=coverage.xml
           dotnet test --collect "XPlat Code Coverage" --collect "Code Coverage"
-          .\.sonar\scanner\dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
+          .sonar/scanner/dotnet-sonarscanner end /d:sonar.login="${{ secrets.SONAR_TOKEN }}"
           mv sonar-project.tmp sonar-project.properties
 
       - name: Install code coverage tool
