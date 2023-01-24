@@ -62,7 +62,7 @@ jobs:
     
       # Run Unit Tests
       - name: Run Unit Tests
-        run: dotnet test --collect:"XPlat Code Coverage"
+        run: dotnet test --collect "XPlat Code Coverage" --collect "Code Coverage"
 
       - name: Install code coverage tool
         run: dotnet tool install --global dotnet-reportgenerator-globaltool
