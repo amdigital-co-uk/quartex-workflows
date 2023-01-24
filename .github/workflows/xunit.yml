@@ -35,7 +35,8 @@ on:
         required: true
       AWS_ROLE_ARN:
         required: true
-
+      SONAR_TOKEN:
+        required: true
 jobs:
   xunit:
     name: Run XUnit Tests
@@ -177,6 +178,14 @@ jobs:
           log_debug "Coverage checking passed"
 
           exit 0
+          
+      # Static Code Analysis
+      - name: SonarCloud Scan
+        if: ${{ secrets.SONAR_TOKEN != '' }}
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       - name: List files in case of failure
         if: failure()
