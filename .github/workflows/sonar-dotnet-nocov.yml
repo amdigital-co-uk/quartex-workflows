@@ -66,9 +66,9 @@ jobs:
         uses: highbyte/sonarscan-dotnet@2.0
         with:
           # The key of the SonarQube project
-          sonarProjectKey: ${{ github.inputs.SONAR_KEY }}
-          sonarProjectName:  ${{ github.inputs.SONAR_PROJECT }}
-          sonarOrganization: ${{ github.inputs.SONAR_ORG }}
+          sonarProjectKey: ${{ github.repository_owner }}_${{ github.event.repository.name }}
+          sonarProjectName:  ${{ github.event.repository.name }}
+          sonarOrganization: ${{ github.repository_owner }}
           dotnetDisableTests: true
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -77,7 +77,7 @@ jobs:
       - name: Check inputs
         if: failure()
         run: |
-          echo "Key: ${{ github.inputs.SONAR_KEY }}, project:  ${{ github.inputs.SONAR_PROJECT }}, org: ${{ github.inputs.SONAR_ORG }}"
+          echo "Key: ${{ github.repository_owner }}_${{ github.event.repository.name }}, project:  ${{ github.event.repository.name }}, org: ${{ github.repository_owner }}"
 
       - name: SonarQube Quality Gate check
         uses: sonarsource/sonarqube-quality-gate-action@master
