@@ -70,6 +70,14 @@ jobs:
           sonarProjectName:  ${{ github.inputs.SONAR_PROJECT }}
           sonarOrganization: ${{ github.inputs.SONAR_ORG }}
           dotnetDisableTests: true
+        env:
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Check inputs
+        if: failure()
+        run: |
+          echo "Key: ${{ github.inputs.SONAR_KEY }}, project:  ${{ github.inputs.SONAR_PROJECT }}, org: ${{ github.inputs.SONAR_ORG }}"
 
       - name: SonarQube Quality Gate check
         uses: sonarsource/sonarqube-quality-gate-action@master
