@@ -66,11 +66,10 @@ jobs:
       - name: SonarScanner for .NET 7 with pull request decoration support
         uses: highbyte/sonarscan-dotnet@v2.1.3
         with:
-          # The key of the SonarQube project
           sonarProjectKey: ${{ github.repository_owner }}_${{ github.event.repository.name }}
           sonarProjectName:  ${{ github.event.repository.name }}
           sonarOrganization: ${{ github.repository_owner }}
-          dotnetDisableTests: true
+          dotnetDisableTests: false
           dotnetPreBuildCmd: dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.PKG_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
@@ -87,7 +86,7 @@ jobs:
         with:
           scanMetadataReportFile: .sonarqube/out/.sonar/report-task.txt
         env:
-         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       # Spins up services via Docker-compose
       - name: Start containers
