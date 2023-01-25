@@ -70,6 +70,7 @@ jobs:
           sonarProjectName:  ${{ github.event.repository.name }}
           sonarOrganization: ${{ github.repository_owner }}
           dotnetDisableTests: true
+          dotnetPreBuildCmd: dotnet nuget add source --username ${{ github.repository_owner }} --password ${{ secrets.PKG_TOKEN }} --store-password-in-clear-text --name github "https://nuget.pkg.github.com/${{ github.repository_owner }}/index.json"
         env:
           SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
