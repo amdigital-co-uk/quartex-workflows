@@ -60,7 +60,7 @@ jobs:
         uses: sonarsource/sonarqube-quality-gate-action@master
         timeout-minutes: 1
         env:
-         SONAR_TOKEN: ${{ secrets.ADAM_SONAR_TOKEN }}
+         SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
 
       # Spins up services via Docker-compose
       - name: Start containers
