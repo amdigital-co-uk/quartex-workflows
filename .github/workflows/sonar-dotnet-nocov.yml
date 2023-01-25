@@ -30,6 +30,18 @@ on:
         required: false
         type: string
         default: null
+      SONAR_ORG:
+        required: false
+        type: string
+        default: ${{ github.repository_owner }}
+      SONAR_PROJECT:
+        required: false
+        type: string
+        default: ${{ github.event.repository.name }}
+      SONAR_KEY:
+        required: false
+        type: string
+        default: ${{ github.repository_owner }}_${{ github.event.repository.name }}
 
     secrets:
       PKG_TOKEN:
@@ -50,11 +62,14 @@ jobs:
           fetch-depth: 0
           
       # Static Code Analysis
-      - name: SonarCloud Scan
-        uses: SonarSource/sonarcloud-github-action@master
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
-          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+      - name: SonarScanner for .NET 7 with pull request decoration support
+        uses: highbyte/sonarscan-dotnet@v2.0
+        with:
+          # The key of the SonarQube project
+          sonarProjectKey: ${{ github.inputs.SONAR_KEY }}
+          sonarProjectName:  ${{ github.inputs.SONAR_PROJECT }}
+          sonarOrganization: ${{ github.inputs.SONAR_ORG }}
+          dotnetDisableTests: true
 
       - name: SonarQube Quality Gate check
         uses: sonarsource/sonarqube-quality-gate-action@master
