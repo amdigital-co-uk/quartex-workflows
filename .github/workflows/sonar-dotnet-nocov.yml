@@ -1,0 +1,202 @@
+# Run unit tests
+name: Run XUnit Tests
+permissions:
+  id-token: write
+  contents: read
+
+# Define Parameters
+on:
+  workflow_call:
+    inputs:
+      DOCKER_COMPOSE:   # Path to docker-compose.yml file: If populated, spins up containers required for integration tests
+        type: string
+      BRANCH_THRESHOLD: # Test coverage threshold (integer): workflow will fail if branch coverage does not meet or exceed this threshold
+                        # If NOT populated, use historic data from previous runs as the threshold.
+                        # Historic data stored in S3, so the AWS secrets must be populated in this instance
+        type: number
+        default: 0
+      COVERAGE_S3_PATH: # S3 path of the CSV that stores historic coverage data (file can contain multiple repos/branches)
+        type: string
+      NEVER_FAIL_AT:
+        type: number
+        default: 95
+      AWS_REGION:
+        type: string
+        default: us-east-1
+      DEBUG:
+        type: string
+        default: FALSE
+      DOTNET_VERSION:
+        required: false
+        type: string
+        default: null
+
+    secrets:
+      PKG_TOKEN:
+        required: true
+      AWS_ROLE_ARN:
+        required: true
+      SONAR_TOKEN:
+        required: true
+jobs:
+  xunit:
+    name: Run XUnit Tests
+    runs-on: ubuntu-latest
+    steps:
+      # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
+      - name: Checkout repository
+        uses: actions/checkout@v3
+        with:
+          fetch-depth: 0
+          
+      # Static Code Analysis
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}  # Needed to get PR information, if any
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+
+      - name: SonarQube Quality Gate check
+        uses: sonarsource/sonarqube-quality-gate-action@master
+        timeout-minutes: 1
+        env:
+         SONAR_TOKEN: ${{ secrets.ADAM_SONAR_TOKEN }}
+
+      # Spins up services via Docker-compose
+      - name: Start containers
+        if: ${{ inputs.DOCKER_COMPOSE != '' }}
+        run: docker compose -f ${{ inputs.DOCKER_COMPOSE }} up -d
+      
+      # Login to GitHub packages
+      - name: Login to GitHub packages
+        uses: actions/setup-dotnet@v3
+        with:
+          dotnet-version: ${{ inputs.DOTNET_VERSION }}
+          source-url: https://nuget.pkg.github.com/amdigital-co-uk/index.json
+        env:
+          NUGET_AUTH_TOKEN: ${{secrets.PKG_TOKEN}}
+    
+      # Run Unit Tests
+      - name: Run Unit Tests
+        run: dotnet test --collect:"XPlat Code Coverage"
+
+      - name: Install code coverage tool
+        run: dotnet tool install --global dotnet-reportgenerator-globaltool
+        
+      - name: Run report generation
+        run: reportgenerator -reports:$GITHUB_WORKSPACE/*/TestResults/*/coverage.cobertura.xml -targetdir:$RUNNER_TEMP/coverlet/reports -reporttypes:"cobertura"
+
+      # Compare against static threshold (BRANCH_THRESHOLD is populated)
+      - name: Check Branch Coverage against static threshold
+        if: ${{ inputs.BRANCH_THRESHOLD > 0 }}
+        uses: amdigital-co-uk/code-coverage-action@v1.0
+        with:
+          path: ${{ runner.temp }}/coverlet/reports/Cobertura.xml
+          branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
+
+      # Compare against historic coverage (BRANCH_THRESHOLD is empty or 0, AWS secrets populated)
+      # Historic data stored in a CSV file in S3, and is updated if coverage improves.
+      - name: Configure AWS credentials
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.AWS_REGION }}
+
+      - name: Check Branch Coverage against historic data
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
+        env:
+          REPO: ${{ github.repository }}
+          BRANCH: ${{ github.ref_name }}
+          COVERAGE_S3_PATH: ${{ inputs.COVERAGE_S3_PATH }}
+          NEVER_FAIL_AT: ${{ inputs.NEVER_FAIL_AT }}
+          PERSIST: false
+          DEBUG: ${{ inputs.DEBUG }}
+        run: |
+          # Utility Functions
+          log_debug() {
+            if [ "$DEBUG" = "true" ]; then echo $@; fi
+          }
+          get_branch() {
+              if [ -f "$1" ]; then
+                  raw=$(cat "$1" | sed -e 's/\r//g' | grep -Po --color=never '<coverage.+branch-rate="\K[^"]+')
+                  echo "$raw * 100" | bc -l | head -c 6
+              else
+                  echo 0
+              fi
+          }
+          get_record() {
+                  local record=$(cat coverage.csv | grep "^$1,$2,")
+                  [ -z "$record" ] && record=$(cat coverage.csv | grep "^$1,$3,")
+                  echo $record
+          }
+
+          # Set behaviour based on current branch
+          [ "$BRANCH" = "main" ] && PERSIST=true
+          [ "$BRANCH" = "main" ] || BRANCH=latest
+
+          # Retrieve or create coverage CSV
+          aws s3 cp --quiet $COVERAGE_S3_PATH coverage.csv || true
+          if [ ! -f "coverage.csv" ]
+          then
+              log_debug "coverage.csv not present, creating placeholder"
+              echo "Repository,Branch,Total Branch Rate,Integration Branch Rate,Unit Branch Rate"  > coverage.csv
+              PERSIST=true
+          else
+              log_debug "coverage.csv downloaded OK"
+          fi
+
+          # Parse current branch coverage
+          integ_report=$(find . -iname coverage.cobertura.xml | grep "\.IntegrationTest" || true)
+          unit_report=$(find . -iname coverage.cobertura.xml | grep "\.Test" || true)
+          log_debug "integ_report=$integ_report, unit_report=$unit_report"
+          total_rate=$(get_branch "$RUNNER_TEMP/coverlet/reports/Cobertura.xml")
+          integ_rate=$(get_branch "$integ_report")
+          unit_rate=$(get_branch "$unit_report")
+          echo "Branch coverage rates for $REPO@$BRANCH -- Total: $total_rate, IntegrationTests: $integ_rate, UnitTests: $unit_rate"
+
+
+          # Parse historic coverage and cross-check
+          record=$(get_record "$REPO" "main" "latest")
+          log_debug "$record"
+
+          if [ -n "$record" ]
+          then
+              total_persist=$(echo $record | cut -d, -f3)
+              integ_persist=$(echo $record | cut -d, -f4)
+              unit_persist=$(echo $record | cut -d, -f5)
+
+              if (( $(echo "$total_persist > $total_rate" | bc -l) ))
+              then
+                  if (( $(echo "$NEVER_FAIL_AT < $total_rate" | bc -l) ))
+                  then
+                      echo "::notice title=Branch coverage fallen::Test coverage has dropped from $total_persist to $total_rate, but is still above $NEVER_FAIL_AT"
+                  else
+                      echo "::error title=Branch coverage failure::Test coverage has dropped from $total_persist to $total_rate"
+                      exit 1
+                  fi
+              else
+                  echo "::notice title=Branch coverage maintained::Test coverage maintained from $total_persist to $total_rate"
+              fi
+
+              # Remove current coverage values
+              cat coverage.csv | grep -v "^$REPO,$BRANCH," > repos.tmp
+              mv repos.tmp coverage.csv
+          else
+              echo "::notice::First time coverage reporting for $REPO@$BRANCH. Coverage is $total_rate"
+          fi
+
+          # Add new coverage values and persist
+          echo "$REPO,$BRANCH,$total_rate,$integ_rate,$unit_rate" >> coverage.csv
+          [ "$PERSIST" = "true" ] && log_debug "Copying coverage.csv to $COVERAGE_S3_PATH"
+          [ "$PERSIST" = "true" ] && aws s3 cp --quiet coverage.csv $COVERAGE_S3_PATH
+          log_debug "Coverage checking passed"
+
+          exit 0
+
+      - name: List files in case of failure
+        if: failure()
+        run: |
+          find . -iname coverage.cobertura.xml
+          find . | grep -v .git/
