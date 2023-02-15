@@ -114,8 +114,10 @@ jobs:
           USE_WORKSPACE: ${{ inputs.APPEND_WORKSPACE_TO_SECRET }}
         run: |
           if [ "$USE_WORKSPACE" = true ]; then
+            echo Getting secret ${{ inputs.AWS_SECRET_NAME }}/$TF_WORKSPACE 
             aws secretsmanager get-secret-value --secret-id "${{ inputs.AWS_SECRET_NAME }}/$TF_WORKSPACE" --query SecretString --output text > secrets.auto.tfvars
           else
+            echo Getting secret ${{ inputs.AWS_SECRET_NAME }}
             aws secretsmanager get-secret-value --secret-id "${{ inputs.AWS_SECRET_NAME }}" --query SecretString --output text > secrets.auto.tfvars
           fi
 
