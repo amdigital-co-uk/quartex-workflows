@@ -163,7 +163,7 @@ jobs:
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
           cp ../nuget.config .          
-          docker build . -f $DK_FILE -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT --build-arg REACT_PROJECT=$REACT_PROJECT
+          docker build . -f $DK_FILE -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT --build-arg $BUILD_REACT_PROJECT=$REACT_PROJECT
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
