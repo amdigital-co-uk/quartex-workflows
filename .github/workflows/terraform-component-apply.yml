@@ -14,6 +14,10 @@ on:
         type: string
       PLAN_ID:
         type: string
+      TERRAFORM_VERSION:
+        type: string
+        default: 1.1.5
+        required: false
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -50,10 +54,10 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: 1.1.5
+          terraform_version: ${{ inputs.TERRAFORM_VERSION }}
           terraform_wrapper: false
           
-      - name: Retreive terraform plan
+      - name: Retrieve terraform plan
         working-directory: components/${{ inputs.COMPONENT }}
         run: aws s3 cp "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$WORKSPACE/${{ inputs.PLAN_ID }}.tfplan" "${{ inputs.PLAN_ID }}.tfplan"
       
@@ -68,7 +72,7 @@ jobs:
         working-directory: components/${{ inputs.COMPONENT }}
         env:
           TF_WORKSPACE: ${{ env.WORKSPACE }}
-        run: terraform apply -no-color "${{ inputs.PLAN_ID }}.tfplan" | tee ../../apply.out
+        run: terraform apply -no-color "${{ inputs.PLAN_ID }}.tfplan" | tee ${{ github.workspace }}/apply.out
       
       - name: Format output
         id: format-output

@@ -14,6 +14,21 @@ on:
         type: string
       PLAN_ID:
         type: string
+      TERRAFORM_VERSION:
+        type: string
+        default: 1.1.5
+        required: false
+      AWS_SECRET_NAME:
+        type: string
+        required: false
+      USE_AWS_SECRET:
+        type: boolean
+        default: false
+        required: false
+      APPEND_WORKSPACE_TO_SECRET:
+        type: boolean
+        default: false
+        required: false
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -57,7 +72,7 @@ jobs:
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v1
         with:
-          terraform_version: 1.1.5
+          terraform_version: ${{ inputs.TERRAFORM_VERSION }}
           terraform_wrapper: false
 
       - name: Terraform Init
@@ -92,11 +107,19 @@ jobs:
         run: terraform validate
 
       - name: Get Secrets from SSM
+        if: ${{ inputs.USE_AWS_SECRET }}
         working-directory: components/${{ inputs.COMPONENT }}
         env:
           TF_WORKSPACE: ${{ env.WORKSPACE }}
-        run: aws secretsmanager get-secret-value --secret-id "terraform/${{ inputs.COMPONENT }}/$TF_WORKSPACE" --query SecretString --output text > envs/secrets.tfvars
-        continue-on-error: true
+          USE_WORKSPACE: ${{ inputs.APPEND_WORKSPACE_TO_SECRET }}
+        run: |
+          if [ "$USE_WORKSPACE" = true ]; then
+            echo Getting secret ${{ inputs.AWS_SECRET_NAME }}/$TF_WORKSPACE 
+            aws secretsmanager get-secret-value --secret-id "${{ inputs.AWS_SECRET_NAME }}/$TF_WORKSPACE" --query SecretString --output text > secrets.auto.tfvars
+          else
+            echo Getting secret ${{ inputs.AWS_SECRET_NAME }}
+            aws secretsmanager get-secret-value --secret-id "${{ inputs.AWS_SECRET_NAME }}" --query SecretString --output text > secrets.auto.tfvars
+          fi
 
       - name: Terraform Plan
         id: plan
@@ -104,7 +127,7 @@ jobs:
         env:
           TF_WORKSPACE: ${{ env.WORKSPACE }}
         run: |
-          terraform plan -no-color -var-file=envs/$TF_WORKSPACE.tfvars -var-file=envs/secrets.tfvars -out "${{ inputs.PLAN_ID }}.tfplan" | tee ../../plan.out
+          terraform plan -no-color -var-file=envs/$TF_WORKSPACE.tfvars -out "${{ inputs.PLAN_ID }}.tfplan" | tee ${{ github.workspace }}/plan.out
           aws s3 cp "${{ inputs.PLAN_ID }}.tfplan" "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$TF_WORKSPACE/${{ inputs.PLAN_ID }}.tfplan"
           
       - name: Format plan
