@@ -21,6 +21,8 @@ Tags should follow [SEMVER](https://semver.org/), except that trailing `.0`s can
 
 ## Create tag
 
+> Note: You can find the current available tags [here](https://github.com/amdigital-co-uk/quartex-workflows/tags).
+
 ```sh
 git tag v3
 git push origin v3
