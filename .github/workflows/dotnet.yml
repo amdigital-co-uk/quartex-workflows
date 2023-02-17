@@ -10,27 +10,31 @@ on:
     inputs:
       REF:
         type: string
-      PROJECT:      # Name of the .csproj file to be built
+      PROJECT:       # Name of the .csproj file to be built
         required: true
         type: string
-      COMPONENT:    # Component name
+      REACT_PROJECT: # Name of the React project to be built
+        required: false
+        type: string
+        default: ""
+      COMPONENT:     # Component name
         required: true
         type: string
-      CONFIGS:      # Configuration repository name: Populate if raw config files are required by the application
+      CONFIGS:       # Configuration repository name: Populate if raw config files are required by the application
         type: string
-      DK_NAMESPACE: # Docker Namespace: Typically this will be 'qtms' for a microservice or 'qtui' for a webapp
+      DK_NAMESPACE:  # Docker Namespace: Typically this will be 'qtms' for a microservice or 'qtui' for a webapp
         required: true
         type: string
-      DK_IMAGE:     # Docker Image
+      DK_IMAGE:      # Docker Image
         required: true
         type: string
-      DK_TAG:       # Default Docker tag: - this should be latest in most cases
+      DK_TAG:        # Default Docker tag: - this should be latest in most cases
         required: true
         type: string
-      ECR_REGION_1: # Primary AWS ECR region
+      ECR_REGION_1:  # Primary AWS ECR region
         required: true
         type: string
-      ECR_REGION_2: # Secondary AWS ECR region to push the Docker image to (optional)
+      ECR_REGION_2:  # Secondary AWS ECR region to push the Docker image to (optional)
         type: string
       BUILD_NPMRC:
         required: false
@@ -152,6 +156,7 @@ jobs:
         env:
           COMPONENT: ${{ inputs.COMPONENT }}
           PROJECT: ${{ inputs.PROJECT }}
+          REACT_PROJECT: ${{ inputs.REACT_PROJECT }}
           DK_FILE: ${{ inputs.DK_FILE }}
           DK_NAMESPACE: ${{ inputs.DK_NAMESPACE }}
           DK_IMAGE: ${{ inputs.DK_IMAGE }}
@@ -159,7 +164,9 @@ jobs:
           DK_REG_2: ${{ steps.login-ecr-2.outputs.registry }}
         run: |
           cp ../nuget.config .          
-          docker build . -f $DK_FILE -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT
+          REACT_ARG=""
+          [ -n "$REACT_PROJECT" ] && REACT_ARG="--build-arg BUILD_REACT_PROJECT=$REACT_PROJECT"
+          docker build . -f $DK_FILE -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT $REACT_ARG
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
           [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
