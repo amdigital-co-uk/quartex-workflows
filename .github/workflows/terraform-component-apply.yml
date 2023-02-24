@@ -18,6 +18,12 @@ on:
         type: string
         default: 1.1.5
         required: false
+      S3_BUCKET:
+        type: string
+        default: amdigital-co-uk-infrastructure-state
+      S3_BUCKET_PREFIX:
+        type: string
+        default: "/plans"
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -59,7 +65,7 @@ jobs:
           
       - name: Retrieve terraform plan
         working-directory: components/${{ inputs.COMPONENT }}
-        run: aws s3 cp "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$WORKSPACE/${{ inputs.PLAN_ID }}.tfplan" "${{ inputs.PLAN_ID }}.tfplan"
+        run: aws s3 cp "s3://${{ inputs.S3_BUCKET }}${{ inputs.S3_BUCKET_PREFIX }}/${{ inputs.COMPONENT }}/$WORKSPACE/${{ inputs.PLAN_ID }}.tfplan" "${{ inputs.PLAN_ID }}.tfplan"
       
       - name: Terraform Init
         id: init

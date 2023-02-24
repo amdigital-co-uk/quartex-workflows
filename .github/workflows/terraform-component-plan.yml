@@ -29,6 +29,12 @@ on:
         type: boolean
         default: false
         required: false
+      S3_BUCKET:
+        type: string
+        default: amdigital-co-uk-infrastructure-state
+      S3_BUCKET_PREFIX:
+        type: string
+        default: "/plans"
     secrets:
       AWS_ROLE_ARN:
         required: true
@@ -128,7 +134,7 @@ jobs:
           TF_WORKSPACE: ${{ env.WORKSPACE }}
         run: |
           terraform plan -no-color -var-file=envs/$TF_WORKSPACE.tfvars -out "${{ inputs.PLAN_ID }}.tfplan" | tee ${{ github.workspace }}/plan.out
-          aws s3 cp "${{ inputs.PLAN_ID }}.tfplan" "s3://amdigital-co-uk-infrastructure-state/plans/${{ inputs.COMPONENT }}/$TF_WORKSPACE/${{ inputs.PLAN_ID }}.tfplan"
+          aws s3 cp "${{ inputs.PLAN_ID }}.tfplan" "s3://${{ inputs.S3_BUCKET }}${{ inputs.S3_BUCKET_PREFIX }}/${{ inputs.COMPONENT }}/$TF_WORKSPACE/${{ inputs.PLAN_ID }}.tfplan"
           
       - name: Format plan
         id: format-plan
