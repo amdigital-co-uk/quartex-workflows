@@ -1,0 +1,61 @@
+name: Deploy Component
+
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+      cluster:
+        type: string
+        required: false
+        default: production
+      namespace:
+        type: string
+        required: false
+        default: live
+      component:
+        type: string
+        required: true
+      docker-tag:
+        type: string
+        required: false
+        default: latest
+      message:
+        type: string
+        required: false
+        default: ""
+      aws-region:
+        type: string
+        required: true
+      sqs-queue:
+        type: string
+        required: true
+    secrets:
+      AWS_ROLE_ARN:
+        required: true
+
+jobs:
+  deploy:
+    name: Deploy Component
+    runs-on: ubuntu-latest
+    steps:
+      - name: Login to AWS
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.aws-region }}
+
+      - name: Enqueue deployment via SQS
+        run: |
+          echo "Enqueuing deployment of ${{ inputs.component }} to ${{ inputs.cluster }}/${{ inputs.namespace }}"
+          queue_url=$(aws sqs get-queue-url --queue-name ${{ inputs.sqs-queue }} | jq .QueueUrl -r)
+          aws sqs send-message --queue-url $queue_url \
+            --message-body "{\"cluster\":\"${{ inputs.cluster }}\",\
+              \"namespace\":\"${{ inputs.namespace }}\",\
+              \"component\":\"${{ inputs.component }}\",\
+              \"imageTag\":\"${{ inputs.docker-tag }}\",\
+              \"user\": \"GitHub Actions\",
+              \"message\": \"${{ inputs.message }}\"}"

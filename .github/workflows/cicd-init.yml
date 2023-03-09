@@ -1,0 +1,102 @@
+name: Release Init
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        type: string
+        required: false
+        default: false
+    secrets:
+      TEAMS_WEBHOOK:
+        required: true
+    outputs:
+      do_release:
+        value: ${{ jobs.setup.outputs.do_release }}
+
+jobs:
+  setup:
+    name: Kickoff release pipeline
+    runs-on: ubuntu-latest
+    outputs:
+      do_release: ${{ steps.parse.outputs.do_release }}
+    steps:
+      - id: parse
+        name: "Check if pull request for 'release' label" 
+        run: |
+          do_release=${{ contains(github.event.pull_request.labels.*.name, 'release') }}
+          echo "do_release=$do_release"
+          echo "do_release=$do_release" >> $GITHUB_OUTPUT
+
+      # https://github.com/marketplace/actions/get-current-pull-request
+      - id: pr
+        name: "Extract pull request body"
+        uses: 8BitJonny/gh-get-current-pr@2.2.0
+        with:
+          sha: ${{ github.event.pull_request.head.sha }}
+
+      - id: comms
+        name: "Parse pull request body"
+        env:
+          PR_BODY: ${{ steps.pr.outputs.pr_body }}
+          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "sed -n '/# Release comms/,\$p'"
+          echo "${PR_BODY}" | sed -n '/# Release comms/,$p'
+          echo "------------------"
+          
+          echo "sed -n '/# Release comms/,\$p' | sed '1d'"
+          echo "${PR_BODY}" | sed -n '/# Release comms/,$p' | sed '1d'
+          echo "------------------"
+
+          comms=$(echo "${PR_BODY}" | sed -n '/# Release comms/,$p' | sed '1d')
+          do_comms=false
+          [ -n "$comms" ] && do_comms=true
+          echo do_comms=$do_comms
+          echo "comms=${comms}"
+          echo do_comms=$do_comms >> $GITHUB_OUTPUT
+          echo 'comms<<EOF' >> $GITHUB_OUTPUT
+          echo "${comms}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: "Post release notification to teams"
+        if: ${{ steps.comms.outputs.do_comms == 'true' && steps.parse.outputs.do_release == 'true' && inputs.dry-run == 'false' }}
+        uses: neonidian/teams-notify-build-status@v3
+        with:
+          webhookUrl: ${{ secrets.TEAMS_WEBHOOK }}
+          title: ${{ github.event.pull_request.title }}
+          message: ${{ steps.comms.outputs.comms }}
+
+      - id: format
+        if: ${{ inputs.dry-run == 'true' }}
+        name: "Format comment"
+        run: |
+          echo "do_release=${{ steps.parse.outputs.do_release }}"
+          echo "do_comms=${{ steps.comms.outputs.do_comms }}"
+          [ "${{ steps.parse.outputs.do_release }}" = "true" ] && echo "#### Perform release: ✅" > comment.txt
+          [ "${{ steps.parse.outputs.do_release }}" = "true" ] || echo "#### Perform release: 🚫" > comment.txt
+
+          [ "${{ steps.comms.outputs.do_comms }}" = "true" ] && echo "#### Post release comms to MS Teams: ✅" >> comment.txt
+          [ "${{ steps.comms.outputs.do_comms }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
+
+          echo 'comment<<EOF' >> $GITHUB_OUTPUT
+          echo "$(cat comment.txt)" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: "Post actions as a comment"
+        if: ${{ inputs.dry-run == 'true' }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `${{ steps.format.outputs.comment }}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+          
