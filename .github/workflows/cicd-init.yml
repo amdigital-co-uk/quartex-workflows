@@ -35,6 +35,27 @@ jobs:
         with:
           sha: ${{ github.event.pull_request.head.sha }}
 
+      - uses: tzkhan/pr-update-action@v2
+        name: 'Update PR description with template'
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && steps.pr.outputs.pr_body == '' && inputs.dry-run == 'true' }}
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          base-branch-regex: .*
+          body-template: |
+            # Release plan
+
+            ## Risks
+
+            # Communication plan
+
+            ## Stakeholders
+
+            Identify your stakeholders here. You will need to manually tag them.
+
+            ## Release comms
+
+            Explain what the release contains
+
       - id: comms
         name: "Parse pull request body"
         env:
