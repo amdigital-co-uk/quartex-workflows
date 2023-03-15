@@ -45,9 +45,11 @@ jobs:
             # Release plan
 
             - Identify any risks, and explain plans to mitigate them
-            - Detail any additional (if any) steps beyond deploying the component related to this repository 
+            - Detail additional steps (if any) beyond deploying the component related to this repository 
 
             # Smoke test plan
+
+            Detail how will you test the release has succeeded, and assert that related functionality has not been impacted.
 
             # Communication plan
 
@@ -102,14 +104,18 @@ jobs:
           then
             echo "### ⚠️ Warning ⚠️ Merging this PR will perform a release" > comment.txt
             echo "" >> comment.txt
-            [ "${{ steps.comms.outputs.do_comms }}" = "true" ] && echo "#### Post release comms to MS Teams: ✅" >> comment.txt
-            [ "${{ steps.comms.outputs.do_comms }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
+            if [ "${{ steps.comms.outputs.do_comms }}" = "true" ]
+            then
+              echo "#### Post release comms to MS Teams: ✅" >> comment.txt
+            else
+              [ "${{ steps.pr.outputs.pr_body == '' }}" = "true" ] && echo "#### Post release comms to MS Teams: 📖 edit template" >> comment.txt
+              [ "${{ steps.pr.outputs.pr_body == '' }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
+            fi
           else
             echo "#### Perform release: 🚫" > comment.txt
             echo "" >> comment.txt
             echo "If this PR needs to be released, please add the \\\`release\\\` label" >> comment.txt
           fi
-
 
           echo 'comment<<EOF' >> $GITHUB_OUTPUT
           echo "$(cat comment.txt)" >> $GITHUB_OUTPUT
