@@ -22,7 +22,7 @@ jobs:
       do_release: ${{ steps.parse.outputs.do_release }}
     steps:
       - id: parse
-        name: "Check if pull request for 'release' label" 
+        name: "Check pull request for 'release' label"
         run: |
           do_release=${{ contains(github.event.pull_request.labels.*.name, 'release') }}
           echo "do_release=$do_release"
@@ -36,7 +36,7 @@ jobs:
           sha: ${{ github.event.pull_request.head.sha }}
 
       - uses: tzkhan/pr-update-action@v2
-        name: 'Update PR description with template'
+        name: 'Update pull request body with template'
         if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && steps.pr.outputs.pr_body == '' && inputs.dry-run == 'true' }}
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
