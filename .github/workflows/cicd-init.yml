@@ -107,7 +107,7 @@ jobs:
           else
             echo "#### Perform release: 🚫" > comment.txt
             echo "" >> comment.txt
-            echo "If this PR needs to be released, please add the \`release\` label" >> comment.txt
+            echo "If this PR needs to be released, please add the \\\`release\\\` label" >> comment.txt
           fi
 
 
