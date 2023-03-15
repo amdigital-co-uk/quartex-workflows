@@ -44,17 +44,20 @@ jobs:
           body-template: |
             # Release plan
 
-            ## Risks
+            - Identify any risks, and explain plans to mitigate them
+            - Detail any additional (if any) steps beyond deploying the component related to this repository 
+
+            # Smoke test plan
 
             # Communication plan
 
             ## Stakeholders
 
-            Identify your stakeholders here. You will need to manually tag them.
+            Identify your stakeholders here. You will need to manually tag them when the release comms are automatically posted.
 
             ## Release comms
 
-            Explain what the release contains
+            Explain what the release contains.
 
       - id: comms
         name: "Parse pull request body"
@@ -95,11 +98,18 @@ jobs:
         run: |
           echo "do_release=${{ steps.parse.outputs.do_release }}"
           echo "do_comms=${{ steps.comms.outputs.do_comms }}"
-          [ "${{ steps.parse.outputs.do_release }}" = "true" ] && echo "#### Perform release: ✅" > comment.txt
-          [ "${{ steps.parse.outputs.do_release }}" = "true" ] || echo "#### Perform release: 🚫" > comment.txt
+          if [ "${{ steps.parse.outputs.do_release }}" = "true" ]
+          then
+            echo "### ⚠️ Warning ⚠️ Merging this PR will perform a release" > comment.txt
+            echo "" >> comment.txt
+            [ "${{ steps.comms.outputs.do_comms }}" = "true" ] && echo "#### Post release comms to MS Teams: ✅" >> comment.txt
+            [ "${{ steps.comms.outputs.do_comms }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
+          else
+            echo "#### Perform release: 🚫" > comment.txt
+            echo "" >> comment.txt
+            echo "If this PR needs to be released, please add the `release` label" >> comment.txt
+          fi
 
-          [ "${{ steps.comms.outputs.do_comms }}" = "true" ] && echo "#### Post release comms to MS Teams: ✅" >> comment.txt
-          [ "${{ steps.comms.outputs.do_comms }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
 
           echo 'comment<<EOF' >> $GITHUB_OUTPUT
           echo "$(cat comment.txt)" >> $GITHUB_OUTPUT
