@@ -28,16 +28,9 @@ jobs:
           echo "do_release=$do_release"
           echo "do_release=$do_release" >> $GITHUB_OUTPUT
 
-      # https://github.com/marketplace/actions/get-current-pull-request
-      - id: pr
-        name: "Extract pull request body"
-        uses: 8BitJonny/gh-get-current-pr@2.2.0
-        with:
-          sha: ${{ github.event.pull_request.head.sha }}
-
       - uses: tzkhan/pr-update-action@v2
         name: 'Update pull request body with template'
-        if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && steps.pr.outputs.pr_body == '' && inputs.dry-run == 'true' }}
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.body == '' && inputs.dry-run == 'true' }}
         with:
           repo-token: "${{ secrets.GITHUB_TOKEN }}"
           base-branch-regex: .*
@@ -64,8 +57,8 @@ jobs:
       - id: comms
         name: "Parse pull request body"
         env:
-          PR_BODY: ${{ steps.pr.outputs.pr_body }}
-          PR_TITLE: ${{ steps.pr.outputs.pr_title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
           TITLE: ${{ github.event.pull_request.title }}
           BODY: ${{ github.event.pull_request.body }}
         run: |
@@ -109,8 +102,8 @@ jobs:
             then
               echo "#### Post release comms to MS Teams: ✅" >> comment.txt
             else
-              [ "${{ steps.pr.outputs.pr_body == '' }}" = "true" ] && echo "#### Post release comms to MS Teams: 📖 edit template" >> comment.txt
-              [ "${{ steps.pr.outputs.pr_body == '' }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
+              [ "${{ github.event.pull_request.body == '' }}" = "true" ] && echo "#### Post release comms to MS Teams: 📖 edit template" >> comment.txt
+              [ "${{ github.event.pull_request.body == '' }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
             fi
           else
             echo "#### Perform release: 🚫" > comment.txt
