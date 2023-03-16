@@ -59,8 +59,6 @@ jobs:
         env:
           PR_BODY: ${{ github.event.pull_request.body }}
           PR_TITLE: ${{ github.event.pull_request.title }}
-          TITLE: ${{ github.event.pull_request.title }}
-          BODY: ${{ github.event.pull_request.body }}
         run: |
           echo "sed -n '/# Release comms/,\$p'"
           echo "${PR_BODY}" | sed -n '/# Release comms/,$p'
