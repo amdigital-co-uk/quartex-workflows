@@ -168,5 +168,8 @@ jobs:
           [ -n "$REACT_PROJECT" ] && REACT_ARG="--build-arg BUILD_REACT_PROJECT=$REACT_PROJECT"
           docker build . -f $DK_FILE -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG --build-arg BUILD_PROJECT=$PROJECT --build-arg BUILD_TAG=$DK_TAG --build-arg BUILD_COMPONENT=$COMPONENT $REACT_ARG
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
-          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
-          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
+          if [ -n "$DK_REG_2" ]
+          then
+            docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
+            docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$DK_TAG
+          fi

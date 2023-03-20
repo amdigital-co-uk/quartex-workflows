@@ -69,6 +69,10 @@ jobs:
             SCC_BRANCH=$REF
             echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
           fi
+          
+          [[ "$SCC_BRANCH" == feature/* ]] && DK_TAG=feature-$(echo ${SCC_BRANCH#feature/})
+          [[ "$SCC_BRANCH" == bug/* ]] && DK_TAG=fix-$(echo ${SCC_BRANCH#bug/})
+          [[ "$SCC_BRANCH" == release/* ]] && DK_TAG=release-$(echo ${SCC_BRANCH#release/})
           [[ "$SCC_BRANCH" == stage/* ]] && TAG=$(echo ${SCC_BRANCH#stage/})
           [[ "$SCC_TAG" == v* ]] && TAG=$SCC_TAG
           echo "BRANCH=$SCC_BRANCH"
