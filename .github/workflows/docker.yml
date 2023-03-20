@@ -124,5 +124,8 @@ jobs:
           cd ${{ inputs.WORKDIR }}
           docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
-          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
-          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          if [ -n "$ECR_REGION_2" ] && [ -n "$DK_REG_2" ] 
+          then 
+            docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+            docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          fi
