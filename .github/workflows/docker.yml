@@ -69,6 +69,10 @@ jobs:
             SCC_BRANCH=$REF
             echo "Branch/Tag parsing: DEFAULT case -- REF=$REF"
           fi
+          
+          [[ "$SCC_BRANCH" == feature/* ]] && DK_TAG=feature-$(echo ${SCC_BRANCH#feature/})
+          [[ "$SCC_BRANCH" == bug/* ]] && DK_TAG=fix-$(echo ${SCC_BRANCH#bug/})
+          [[ "$SCC_BRANCH" == release/* ]] && DK_TAG=release-$(echo ${SCC_BRANCH#release/})
           [[ "$SCC_BRANCH" == stage/* ]] && TAG=$(echo ${SCC_BRANCH#stage/})
           [[ "$SCC_TAG" == v* ]] && TAG=$SCC_TAG
           echo "BRANCH=$SCC_BRANCH"
@@ -124,5 +128,8 @@ jobs:
           cd ${{ inputs.WORKDIR }}
           docker build . -t $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
           docker push $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG
-          [ -n "$DK_REG_2" ] && docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
-          [ -n "$DK_REG_2" ] && docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          if [ -n "$ECR_REGION_2" ] && [ -n "$DK_REG_2" ] 
+          then 
+            docker tag $DK_REG_1/$DK_NAMESPACE/$DK_IMAGE:$TAG $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+            docker push $DK_REG_2/$DK_NAMESPACE/$DK_IMAGE:$TAG
+          fi
