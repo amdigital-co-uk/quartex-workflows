@@ -1,0 +1,131 @@
+name: Release Init
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        type: string
+        required: false
+        default: false
+    secrets:
+      TEAMS_WEBHOOK:
+        required: true
+    outputs:
+      do_release:
+        value: ${{ jobs.setup.outputs.do_release }}
+
+jobs:
+  setup:
+    name: Kickoff release pipeline
+    runs-on: ubuntu-latest
+    outputs:
+      do_release: ${{ steps.parse.outputs.do_release }}
+    steps:
+      - id: parse
+        name: "Check pull request for 'release' label"
+        run: |
+          do_release=${{ contains(github.event.pull_request.labels.*.name, 'release') }}
+          echo "do_release=$do_release"
+          echo "do_release=$do_release" >> $GITHUB_OUTPUT
+
+      - uses: tzkhan/pr-update-action@v2
+        name: 'Update pull request body with template'
+        if: ${{ contains(github.event.pull_request.labels.*.name, 'release') && github.event.pull_request.body == '' && inputs.dry-run == 'true' }}
+        with:
+          repo-token: "${{ secrets.GITHUB_TOKEN }}"
+          base-branch-regex: .*
+          body-template: |
+            # Release plan
+
+            - Identify any risks, and explain plans to mitigate them
+            - Detail additional steps (if any) beyond deploying the component related to this repository 
+
+            # Smoke test plan
+
+            Detail how will you test the release has succeeded, and assert that related functionality has not been impacted.
+
+            # Communication plan
+
+            ## Stakeholders
+
+            Identify your stakeholders here. You will need to manually tag them when the release comms are automatically posted.
+
+            ## Release comms
+
+            Explain what the release contains.
+
+      - id: comms
+        name: "Parse pull request body"
+        env:
+          PR_BODY: ${{ github.event.pull_request.body }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+        run: |
+          echo "sed -n '/# Release comms/,\$p'"
+          echo "${PR_BODY}" | sed -n '/# Release comms/,$p'
+          echo "------------------"
+          
+          echo "sed -n '/# Release comms/,\$p' | sed '1d'"
+          echo "${PR_BODY}" | sed -n '/# Release comms/,$p' | sed '1d'
+          echo "------------------"
+
+          comms=$(echo "${PR_BODY}" | sed -n '/# Release comms/,$p' | sed '1d')
+          do_comms=false
+          [ -n "$comms" ] && do_comms=true
+          echo do_comms=$do_comms
+          echo "comms=${comms}"
+          echo do_comms=$do_comms >> $GITHUB_OUTPUT
+          echo 'comms<<EOF' >> $GITHUB_OUTPUT
+          echo "${comms}" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: "Post release notification to teams"
+        if: ${{ steps.comms.outputs.do_comms == 'true' && steps.parse.outputs.do_release == 'true' && inputs.dry-run == 'false' }}
+        uses: neonidian/teams-notify-build-status@v3
+        with:
+          webhookUrl: ${{ secrets.TEAMS_WEBHOOK }}
+          title: ${{ github.event.pull_request.title }}
+          message: ${{ steps.comms.outputs.comms }}
+
+      - id: format
+        if: ${{ inputs.dry-run == 'true' }}
+        name: "Format comment"
+        run: |
+          echo "do_release=${{ steps.parse.outputs.do_release }}"
+          echo "do_comms=${{ steps.comms.outputs.do_comms }}"
+          if [ "${{ steps.parse.outputs.do_release }}" = "true" ]
+          then
+            echo "### ⚠️ Warning ⚠️ Merging this PR will perform a release" > comment.txt
+            echo "" >> comment.txt
+            if [ "${{ steps.comms.outputs.do_comms }}" = "true" ]
+            then
+              echo "#### Post release comms to MS Teams: ✅" >> comment.txt
+            else
+              [ "${{ github.event.pull_request.body == '' }}" = "true" ] && echo "#### Post release comms to MS Teams: 📖 edit template" >> comment.txt
+              [ "${{ github.event.pull_request.body == '' }}" = "true" ] || echo "#### Post release comms to MS Teams: 🚫" >> comment.txt
+            fi
+          else
+            echo "#### Perform release: 🚫" > comment.txt
+            echo "" >> comment.txt
+            echo "If this PR needs to be released, please add the \\\`release\\\` label" >> comment.txt
+          fi
+
+          echo 'comment<<EOF' >> $GITHUB_OUTPUT
+          echo "$(cat comment.txt)" >> $GITHUB_OUTPUT
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: "Post actions as a comment"
+        if: ${{ inputs.dry-run == 'true' }}
+        uses: actions/github-script@v6
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const output = `${{ steps.format.outputs.comment }}`;
+
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: output
+            });
+
+          
