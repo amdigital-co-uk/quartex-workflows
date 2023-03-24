@@ -30,6 +30,15 @@ on:
         required: false
         type: string
         default: null
+      CONFIG_FILE_S3_ROOT:
+        required: false
+        type: string
+      CONFIG_FILE:
+        required: false
+        type: string
+      COPY_CONFIG_FILE_TO_PROJECTS:
+        required: false
+        type: string
     secrets:
       PKG_TOKEN:
         required: true
@@ -44,7 +53,36 @@ jobs:
       # Checks-out your repository under $GITHUB_WORKSPACE, so your job can access it
       - name: Checkout repository
         uses: actions/checkout@v3
-      
+
+      # Compare against historic coverage (BRANCH_THRESHOLD is empty or 0, AWS secrets populated)
+      # Historic data stored in a CSV file in S3, and is updated if coverage improves.
+      - name: Configure AWS credentials
+        if: ${{ inputs.BRANCH_THRESHOLD <= 0 || inputs.CONFIG_FILE != ''}}
+        uses: aws-actions/configure-aws-credentials@v1
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.AWS_REGION }}
+
+      - name: Copy config file from s3 
+        if: ${{ inputs.CONFIG_FILE != ''}}
+        env:
+          CONFIG_FILE: ${{ inputs.CONFIG_FILE }}
+          CONFIG_FILE_S3_ROOT: ${{ inputs.CONFIG_FILE_S3_ROOT }}
+        run: |
+          aws s3 cp $CONFIG_FILE_S3_ROOT/$CONFIG_FILE .
+
+      - name: Copy config file to projects
+        if: ${{ inputs.COPY_CONFIG_FILE_TO_PROJECTS != '' }}
+        env:
+          PROJECTS: ${{ inputs.COPY_CONFIG_FILE_TO_PROJECTS }}
+          CONFIG_FILE: ${{ inputs.CONFIG_FILE }}
+        run: |
+          for project in $PROJECTS
+          do
+            cp $CONFIG_FILE $project
+          done
+
       # Spins up services via Docker-compose
       - name: Start containers
         if: ${{ inputs.DOCKER_COMPOSE != '' }}
@@ -76,16 +114,6 @@ jobs:
         with:
           path: ${{ runner.temp }}/coverlet/reports/Cobertura.xml
           branch_minimum_threshold: ${{ inputs.BRANCH_THRESHOLD }}
-
-      # Compare against historic coverage (BRANCH_THRESHOLD is empty or 0, AWS secrets populated)
-      # Historic data stored in a CSV file in S3, and is updated if coverage improves.
-      - name: Configure AWS credentials
-        if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
-        uses: aws-actions/configure-aws-credentials@v1
-        with:
-          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          role-duration-seconds: 900
-          aws-region: ${{ inputs.AWS_REGION }}
 
       - name: Check Branch Coverage against historic data
         if: ${{ inputs.BRANCH_THRESHOLD <= 0 }}
