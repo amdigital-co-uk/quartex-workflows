@@ -80,7 +80,7 @@ jobs:
         run: |
           for project in $PROJECTS
           do
-            echo cp $CONFIG_FILE $project
+            cp $CONFIG_FILE $project
           done
 
       # Spins up services via Docker-compose
