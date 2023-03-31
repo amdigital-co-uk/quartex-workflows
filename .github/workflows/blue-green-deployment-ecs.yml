@@ -9,9 +9,6 @@ on:
         ECR_REGION_1:
             type: string
             default: us-east-1
-        NODE_VERSION:
-            type: number
-            default: 18
         AWS_ROLE_ARN:
             type: string
         AC_IMAGE_VERSION:
@@ -32,6 +29,8 @@ on:
             type: string
         AC_PRODUCTION_HEALTH_CHECK_URL:
             type: string
+env:
+    NODE_VERSION: 18
 
 jobs:
   build:
@@ -44,7 +43,7 @@ jobs:
       DK_TAG: ${{ format('1.0.0-{0}', github.event.number) }}
       ECR_REGION_1: us-east-1
     secrets:
-      AWS_ROLE_ARN: ${{ secrets.AC_PIPELINE_ECR_ARN }}
+      AWS_ROLE_ARN: ${{ inputs.AC_PIPELINE_ECR_ARN }}
 
   deploy:
     name: Deploy to Stage and Switch Slots
@@ -61,9 +60,9 @@ jobs:
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-to-assume: ${{ inputs.AWS_ROLE_ARN }}
           role-duration-seconds: 900
-          aws-region: ${{ env.ECR_REGION_1 }}
+          aws-region: ${{ inputs.ECR_REGION_1 }}
 
       - name: Login to Amazon ECR (us-east-1)
         id: login-ecr-1
@@ -132,9 +131,9 @@ jobs:
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-to-assume: ${{ inputs.AWS_ROLE_ARN }}
           role-duration-seconds: 900
-          aws-region: ${{ env.ECR_REGION_1 }}
+          aws-region: ${{ inputs.ECR_REGION_1 }}
 
       - name: Setup Node and NPM
         uses: actions/setup-node@v3
@@ -164,9 +163,9 @@ jobs:
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
         with:
-          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-to-assume: ${{ inputs.AWS_ROLE_ARN }}
           role-duration-seconds: 900
-          aws-region: ${{ env.ECR_REGION_1 }}
+          aws-region: ${{ inputs.ECR_REGION_1 }}
 
       - name: Setup Node and NPM
         uses: actions/setup-node@v3
