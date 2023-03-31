@@ -1,0 +1,185 @@
+name: Build and publish
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_dispatch:
+    inputs:
+        ECR_REGION_1:
+            type: string
+            default: us-east-1
+        NODE_VERSION:
+            type: number
+            default: 18
+        AWS_ROLE_ARN:
+            type: string
+        AC_IMAGE_VERSION:
+            type: string
+        AC_SERVICE_NAME:
+            type: string
+        AC_LISTENER_PORT:
+            type: number
+            default: 80
+        AC_REGION:
+            type: string
+            default: us-east-1
+        AC_CLUSTER:
+            type: string
+        AC_PRODUCTION_URL:
+            type: string
+        AC_STAGING_URL:
+            type: string
+        AC_PRODUCTION_HEALTH_CHECK_URL:
+            type: string
+
+jobs:
+  build:
+    if: ${{ github.event.pull_request.merged == true || github.event_name == 'workflow_dispatch' }}
+    uses: amdigital-co-uk/quartex-workflows/.github/workflows/docker.yml@v15
+    with:
+      REF: ${{ github.ref }}
+      DK_NAMESPACE: ac
+      DK_IMAGE: pac-service
+      DK_TAG: ${{ format('1.0.0-{0}', github.event.number) }}
+      ECR_REGION_1: us-east-1
+    secrets:
+      AWS_ROLE_ARN: ${{ secrets.AC_PIPELINE_ECR_ARN }}
+
+  deploy:
+    name: Deploy to Stage and Switch Slots
+    needs: build
+    runs-on: ubuntu-latest
+    outputs:
+      production_version: ${{ steps.info.outputs.production_version }}
+      staging_version: ${{ steps.info.outputs.staging_version }}
+      deploy_version: ${{ steps.info.outputs.deploy_version }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ env.ECR_REGION_1 }}
+
+      - name: Login to Amazon ECR (us-east-1)
+        id: login-ecr-1
+        uses: aws-actions/amazon-ecr-login@v1
+
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build deploy-tooling
+        working-directory: deploy-tooling
+        run: |
+          npm install
+          npm run build
+
+      - name: Gather version info
+        id: info
+        working-directory: deploy-tooling
+        run: |
+          npm run --silent status > status.json
+          production_version=$(cat status.json | jq -r .production.version)
+          staging_version=$(cat status.json | jq -r .staging.version)
+          echo "production_version=$production_version" >> $GITHUB_OUTPUT
+          echo "staging_version=$staging_version" >> $GITHUB_OUTPUT
+          echo "deploy_version=$AC_IMAGE_VERSION" >> $GITHUB_OUTPUT
+          cat $GITHUB_OUTPUT
+
+      - name: Echo version info in case of failure
+        if: failure()
+        working-directory: deploy-tooling
+        run: |
+          echo "---------------"
+          cat status.json
+          echo "---------------"
+      - name: Deploy to stage
+        working-directory: deploy-tooling
+        run: |
+          npm run stage-deploy $AC_IMAGE_VERSION
+
+      - name: Switch slots
+        working-directory: deploy-tooling
+        run: npm run swap
+
+  smoketest:
+    name: Smoke Test
+    needs: deploy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Automated tests
+        run: |
+          echo "${{ needs.deploy.outputs.deploy_version }}, ${{ needs.deploy.outputs.production_version }}, ${{ needs.deploy.outputs.staging_version }}"
+          curl $AC_PRODUCTION_HEALTH_CHECK_URL | grep $AC_IMAGE_VERSION
+
+  update-stage:
+    name: Keep staging up-to-date
+    needs: smoketest
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ env.ECR_REGION_1 }}
+
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build deploy-tooling
+        working-directory: deploy-tooling
+        run: |
+          npm install
+          npm run build
+
+      - name: Keep staging up-to-date
+        working-directory: deploy-tooling
+        run: |
+          npm run stage-ensure $AC_IMAGE_VERSION
+
+  update-rollback:
+    name: Rollback production in case of failure
+    if: ${{ failure() }}
+    needs: [smoketest, deploy]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ env.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ env.ECR_REGION_1 }}
+
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build deploy-tooling
+        working-directory: deploy-tooling
+        run: |
+          npm install
+          npm run build
+
+      - name: Rollback production in case of failure
+        working-directory: deploy-tooling
+        run: |
+          npm run rollback ${{ needs.deploy.outputs.production_version }}
