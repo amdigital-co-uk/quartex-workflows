@@ -62,6 +62,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Checkout tools repo
+        uses: actions/checkout@v3
+        with:
+          repository: amdigital-co-uk/quartex-workflows
+          ref: feature/blue-green-deployment-workflow
+          path: common-build-tools
+
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -79,14 +86,14 @@ jobs:
           node-version: ${{ inputs.NODE_VERSION }}
 
       - name: Build deploy-tooling
-        working-directory: deploy-tooling
+        working-directory:  common-build-tools/deploy-tooling
         run: |
           npm install
           npm run build
 
       - name: Gather version info
         id: info
-        working-directory: deploy-tooling
+        working-directory:  common-build-tools/deploy-tooling
         run: |
           npm run --silent status > status.json
           production_version=$(cat status.json | jq -r .production.version)
@@ -98,18 +105,18 @@ jobs:
 
       - name: Echo version info in case of failure
         if: failure()
-        working-directory: deploy-tooling
+        working-directory:  common-build-tools/deploy-tooling
         run: |
           echo "---------------"
           cat status.json
           echo "---------------"
       - name: Deploy to stage
-        working-directory: deploy-tooling
+        working-directory:  common-build-tools/deploy-tooling
         run: |
           npm run stage-deploy $AC_IMAGE_VERSION
 
       - name: Switch slots
-        working-directory: deploy-tooling
+        working-directory:  common-build-tools/deploy-tooling
         run: npm run swap
 
   smoketest:
@@ -133,6 +140,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Checkout tools repo
+        uses: actions/checkout@v3
+        with:
+          repository: amdigital-co-uk/quartex-workflows
+          ref: feature/blue-green-deployment-workflow
+          path: common-build-tools
+
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -146,13 +160,13 @@ jobs:
           node-version: ${{ inputs.NODE_VERSION }}
 
       - name: Build deploy-tooling
-        working-directory: deploy-tooling
+        working-directory: common-build-tools/deploy-tooling
         run: |
           npm install
           npm run build
 
       - name: Keep staging up-to-date
-        working-directory: deploy-tooling
+        working-directory: common-build-tools/deploy-tooling
         run: |
           npm run stage-ensure $AC_IMAGE_VERSION
 
@@ -165,6 +179,13 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v3
 
+      - name: Checkout tools repo
+        uses: actions/checkout@v3
+        with:
+          repository: amdigital-co-uk/quartex-workflows
+          ref: feature/blue-green-deployment-workflow
+          path: common-build-tools
+
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
         with:
@@ -178,12 +199,12 @@ jobs:
           node-version: ${{ inputs.NODE_VERSION }}
 
       - name: Build deploy-tooling
-        working-directory: deploy-tooling
+        working-directory: common-build-tools/deploy-tooling
         run: |
           npm install
           npm run build
 
       - name: Rollback production in case of failure
-        working-directory: deploy-tooling
+        working-directory: common-build-tools/deploy-tooling
         run: |
           npm run rollback ${{ needs.deploy.outputs.production_version }}
