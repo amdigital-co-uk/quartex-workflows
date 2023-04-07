@@ -74,7 +74,6 @@ jobs:
           repository: amdigital-co-uk/acif-deploy-tooling
           ref: feature/add-deploy-tooling-scripts
           path: common-build-tools
-          token: ${{ secrets.SRC_TOKEN }}
 
       - name: Configure AWS credentials (ECR_REGION_1)
         uses: aws-actions/configure-aws-credentials@v2
