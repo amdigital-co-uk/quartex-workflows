@@ -71,8 +71,8 @@ jobs:
       - name: Checkout tools repo
         uses: actions/checkout@v3
         with:
-          repository: amdigital-co-uk/quartex-workflows
-          ref: feature/blue-green-deployment-workflow
+          repository: amdigital-co-uk/acif-deploy-tooling
+          ref: feature/add-deploy-tooling-scripts
           path: common-build-tools
 
       - name: Configure AWS credentials (ECR_REGION_1)
