@@ -37,6 +37,7 @@ on:
 env:
     AC_SERVICE_NAME: ${{inputs.AC_SERVICE_NAME}}
     AC_LISTENER_PORT: ${{inputs.AC_LISTENER_PORT}}
+    AC_REGION: ${{inputs.AC_REGION}}
 
 jobs:
   build:
