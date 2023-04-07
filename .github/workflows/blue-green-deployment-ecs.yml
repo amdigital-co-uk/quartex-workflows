@@ -38,6 +38,10 @@ env:
     AC_SERVICE_NAME: ${{inputs.AC_SERVICE_NAME}}
     AC_LISTENER_PORT: ${{inputs.AC_LISTENER_PORT}}
     AC_REGION: ${{inputs.AC_REGION}}
+    AC_CLUSTER: ${{inputs.AC_CLUSTER}}
+    AC_PRODUCTION_URL: ${{inputs.AC_PRODUCTION_URL}}
+    AC_STAGING_URL: ${{inputs.AC_STAGING_URL}}
+    AC_PRODUCTION_HEALTH_CHECK_URL: ${{inputs.AC_PRODUCTION_HEALTH_CHECK_URL}}
 
 jobs:
   build:
