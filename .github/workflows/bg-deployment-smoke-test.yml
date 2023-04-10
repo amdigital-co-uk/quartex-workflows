@@ -1,0 +1,30 @@
+name: Smoke Test
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+        AC_IMAGE_VERSION:
+            type: string
+        AC_PRODUCTION_HEALTH_CHECK_URL:
+            type: string
+    secrets:
+        AWS_ROLE_ARN:
+            required: true
+
+env:
+    AC_PRODUCTION_HEALTH_CHECK_URL: ${{inputs.AC_PRODUCTION_HEALTH_CHECK_URL}}
+
+jobs:
+  smoketest:
+    name: Smoke Test
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Automated tests
+        run: |
+          curl $AC_PRODUCTION_HEALTH_CHECK_URL | grep $AC_IMAGE_VERSION
