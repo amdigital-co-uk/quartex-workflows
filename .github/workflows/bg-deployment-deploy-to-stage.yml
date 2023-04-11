@@ -16,6 +16,20 @@ on:
             type: string
         AC_SERVICE_NAME:
             type: string
+        AC_LISTENER_PORT:
+            type: number
+            default: 80
+        AC_REGION:
+            type: string
+            default: us-east-1
+        AC_CLUSTER:
+            type: string
+        AC_PRODUCTION_URL:
+            type: string
+        AC_STAGING_URL:
+            type: string
+        AC_PRODUCTION_HEALTH_CHECK_URL:
+            type: string
 
     secrets:
         AWS_ROLE_ARN:
@@ -32,6 +46,12 @@ jobs:
     env:
         AC_IMAGE_VERSION:  ${{ inputs.AC_IMAGE_VERSION }}
         AC_SERVICE_NAME:  ${{ inputs.AC_SERVICE_NAME }}
+        AC_LISTENER_PORT:  ${{ inputs.AC_LISTENER_PORT }}
+        AC_REGION:  ${{ inputs.AC_REGION }}
+        AC_CLUSTER:  ${{ inputs.AC_CLUSTER }}
+        AC_PRODUCTION_URL:  ${{ inputs.AC_PRODUCTION_URL }}
+        AC_STAGING_URL:  ${{ inputs.AC_STAGING_URL }}
+        AC_PRODUCTION_HEALTH_CHECK_URL:  ${{ inputs.AC_PRODUCTION_HEALTH_CHECK_URL }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3
