@@ -20,7 +20,7 @@ on:
 
 jobs:
   deploy:
-    name: Deploy to Stage
+    name: Swap Slots
     runs-on: ubuntu-latest
     outputs:
       production_version: ${{ steps.info.outputs.production_version }}

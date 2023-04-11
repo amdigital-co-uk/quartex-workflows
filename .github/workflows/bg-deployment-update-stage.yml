@@ -1,0 +1,55 @@
+name: Update Stages
+permissions:
+  id-token: write
+  contents: read
+
+on:
+  workflow_call:
+    inputs:
+        ECR_REGION_1:
+            type: string
+            default: us-east-1
+        NODE_VERSION:
+            type: number
+            default: 18
+    secrets:
+        AWS_ROLE_ARN:
+            required: true
+
+jobs:
+  update-stage:
+    name: Keep staging up-to-date
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+
+      - name: Checkout tools repo
+        uses: actions/checkout@v3
+        with:
+          repository: amdigital-co-uk/quartex-workflows
+          ref: feature/blue-green-deployment-workflow
+          path: common-build-tools
+
+      - name: Configure AWS credentials (ECR_REGION_1)
+        uses: aws-actions/configure-aws-credentials@v2
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          role-duration-seconds: 900
+          aws-region: ${{ inputs.ECR_REGION_1 }}
+
+      - name: Setup Node and NPM
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ inputs.NODE_VERSION }}
+
+      - name: Build deploy-tooling
+        working-directory: common-build-tools/deploy-tooling
+        run: |
+          npm install
+          npm run build
+
+      - name: Keep staging up-to-date
+        working-directory: common-build-tools/deploy-tooling
+        run: |
+          npm run stage-ensure $AC_IMAGE_VERSION

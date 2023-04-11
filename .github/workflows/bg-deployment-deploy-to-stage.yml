@@ -12,8 +12,6 @@ on:
         NODE_VERSION:
             type: number
             default: 18
-        AC_IMAGE_VERSION:
-            type: string
     secrets:
         AWS_ROLE_ARN:
             required: true
