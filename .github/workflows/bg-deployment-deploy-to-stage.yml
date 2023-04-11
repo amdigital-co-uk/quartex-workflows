@@ -16,6 +16,7 @@ on:
             type: string
         AC_SERVICE_NAME:
             type: string
+
     secrets:
         AWS_ROLE_ARN:
             required: true
@@ -28,6 +29,9 @@ jobs:
       production_version: ${{ steps.info.outputs.production_version }}
       staging_version: ${{ steps.info.outputs.staging_version }}
       deploy_version: ${{ steps.info.outputs.deploy_version }}
+    env:
+        AC_IMAGE_VERSION:  ${{ inputs.AC_IMAGE_VERSION }}
+        AC_SERVICE_NAME:  ${{ inputs.AC_SERVICE_NAME }}
     steps:
       - name: Checkout repository
         uses: actions/checkout@v3

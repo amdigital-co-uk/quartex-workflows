@@ -13,9 +13,9 @@ on:
             type: number
             default: 18
         AC_IMAGE_VERSION:
-            type: string
+                type: string
         AC_SERVICE_NAME:
-            type: string
+                type: string
     secrets:
         AWS_ROLE_ARN:
             required: true
@@ -24,6 +24,9 @@ jobs:
   update-rollback:
     name: Rollback production in case of failure
     if: ${{ failure() }}
+    env:
+        AC_IMAGE_VERSION:  ${{ inputs.AC_IMAGE_VERSION }}
+        AC_SERVICE_NAME:  ${{ inputs.AC_SERVICE_NAME }}
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
