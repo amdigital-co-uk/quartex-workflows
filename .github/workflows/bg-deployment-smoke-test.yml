@@ -12,7 +12,8 @@ on:
             type: string
 
 env:
-    AC_PRODUCTION_HEALTH_CHECK_URL: ${{inputs.AC_PRODUCTION_HEALTH_CHECK_URL}}
+    AC_PRODUCTION_HEALTH_CHECK_URL: ${{ inputs.AC_PRODUCTION_HEALTH_CHECK_URL }}
+    AC_IMAGE_VERSION: ${{ inputs.AC_IMAGE_VERSION }}
 
 jobs:
   smoketest:

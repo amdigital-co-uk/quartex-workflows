@@ -38,7 +38,6 @@ on:
 jobs:
   update-rollback:
     name: Rollback production in case of failure
-    if: ${{ failure() }}
     env:
         AC_IMAGE_VERSION:  ${{ inputs.AC_IMAGE_VERSION }}
         AC_SERVICE_NAME:  ${{ inputs.AC_SERVICE_NAME }}
