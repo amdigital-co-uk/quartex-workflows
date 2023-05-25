@@ -1,4 +1,4 @@
-name: Dotnet publish & Serverless deploy
+name: NodeJS publish & Serverless deploy
 permissions:
   id-token: write
   contents: read
