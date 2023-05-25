@@ -26,7 +26,7 @@ on:
 
 jobs:
   deploy:
-    name: Dotnet publish & Serverless deploy
+    name: NodeJS publish & Serverless deploy
     runs-on: ubuntu-latest
     env:
       REF: ${{ inputs.REF }}
