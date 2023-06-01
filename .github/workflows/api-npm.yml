@@ -56,10 +56,12 @@ jobs:
           VERSION=$(cat $NAMESPACE/$NAMESPACE.csproj | grep "<Version>" | cut -d ">" -f 2 | cut -d "<" -f1)
           cd ${{ inputs.PROJECT }}
           cat << EFO > Program.cs
-          using Quartex.ServiceClient.ScriptGenerator;
           public class Program
           {
-              public static void Main(string[] args) => new RequestScriptsGenerator().Run(args);
+              public static void Main(string[] args) {
+                System.Reflection.Assembly.Load("$NAMESPACE");
+                new Quartex.ServiceClient.ScriptGenerator.RequestScriptsGenerator().Run(args);
+              }
           }
           EOF
           dotnet restore && dotnet build
