@@ -52,10 +52,18 @@ jobs:
       - name: Generate NPM package
         env:
           NAMESPACE: ${{ inputs.NAMESPACE }}
-        run: |
+        run: | # Create minimal Program.cs file to just run the RequestScriptsGenerator
           VERSION=$(cat $NAMESPACE/$NAMESPACE.csproj | grep "<Version>" | cut -d ">" -f 2 | cut -d "<" -f1)
           cd ${{ inputs.PROJECT }}
-          echo "{}" > compiled-config.json
+          cat << EOF > Program.cs
+          public class Program
+          {
+              public static void Main(string[] args) {
+                System.Reflection.Assembly.Load("$NAMESPACE");
+                new Quartex.ServiceClient.ScriptGenerator.RequestScriptsGenerator().Run(args);
+              }
+          }
+          EOF
           dotnet restore && dotnet build
           dotnet run --generate-api-ts .. ${{ inputs.PREFIX }} ${{ inputs.NAMESPACE }} "$GITHUB_SERVER_URL/$GITHUB_REPOSITORY.git" ${{ inputs.NPM_SCOPE }}/${{ inputs.PACKAGE }} $VERSION
           cat ../package.json
