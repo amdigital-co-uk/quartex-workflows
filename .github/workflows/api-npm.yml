@@ -4,31 +4,31 @@ name: Build and publish NuGet package
 on:
   workflow_call:
     inputs:
-      PKG_SRC: # URL of private GitHub packages feed to push to
+      PKG_SRC:        # URL of private GitHub packages feed to push to
         required: true
         type: string
-      PROJECT: # .NET project that generates the TypeScript
+      PROJECT:          # .NET project that generates the TypeScript
         required: true
         type: string
-      NAMESPACE: # Namespace of request objects to include
+      NAMESPACE:        # Namespace of request objects to include
         required: true
         type: string
-      DOTNET: # Dotnet version of project
+      DOTNET:           # Dotnet version of project
         required: false
         type: string
-      PREFIX: # TypeScript-safe prefix for client and request config classnames
+      PREFIX:           # TypeScript-safe prefix for client and request config classnames
         required: true
         type: string
-      NPM_SRC: # NPM Feed to push packages to
+      NPM_SRC:          # NPM Feed to push packages to
         required: true
         type: string
-      NPM_SCOPE: # NPM Scope
+      NPM_SCOPE:        # NPM Scope
         required: true
         type: string
-      PACKAGE: # Package (must include scope)
+      PACKAGE:          # Package (must include scope)
         required: true
         type: string
-
+      
     secrets:
       PKG_TOKEN:
         required: true
@@ -52,8 +52,7 @@ jobs:
       - name: Generate NPM package
         env:
           NAMESPACE: ${{ inputs.NAMESPACE }}
-        run:
-          | # Create minimal Program.cs file to just run the RequestScriptsGenerator
+        run: | # Create minimal Program.cs file to just run the RequestScriptsGenerator
           VERSION=$(cat $NAMESPACE/$NAMESPACE.csproj | grep "<Version>" | cut -d ">" -f 2 | cut -d "<" -f1)
           cd ${{ inputs.PROJECT }}
           cat << EOF > Program.cs
@@ -73,7 +72,7 @@ jobs:
       - name: Setup Node and NPM
         uses: actions/setup-node@v2
         with:
-          node-version: "16.x"
+          node-version: '12.x'
           registry-url: ${{ inputs.NPM_SRC }}
           scope: ${{ inputs.NPM_SCOPE }}
 
