@@ -1,5 +1,5 @@
 # CI workflow for Quartex .NET application
-name: Build and Package
+name: Build Component
 permissions:
   id-token: write
   contents: read
@@ -58,7 +58,7 @@ on:
 
 jobs:
   build:
-    name: Test, Build and Package
+    name: Build Component
     runs-on: ubuntu-latest
     env:
       REF: ${{ inputs.REF }}
