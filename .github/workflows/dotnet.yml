@@ -47,7 +47,6 @@ on:
       DOTNET_VERSION:
         required: false
         type: string
-        default: null
     secrets:
       SRC_TOKEN:
         required: false
