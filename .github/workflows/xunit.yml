@@ -29,7 +29,6 @@ on:
       DOTNET_VERSION:
         required: false
         type: string
-        default: null
       CONFIG_FILE_S3_ROOT:
         required: false
         type: string
